@@ -304,14 +304,14 @@ function SettingsPageV2({ profile, updateProfile, resetData }: DucereProps) {
 }
 
 function SettingsPageV3({ profile, updateProfile, resetData }: DucereProps) {
-  const countries = ['United States', 'India', 'Canada', 'United Kingdom', 'Australia', 'New Zealand', 'Japan', 'South Korea', 'Singapore', 'United Arab Emirates', 'Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Sweden', 'Brazil', 'Mexico'];
+  const countries = [['US','United States'],['IN','India'],['CA','Canada'],['GB','United Kingdom'],['AU','Australia'],['NZ','New Zealand'],['JP','Japan'],['KR','South Korea'],['SG','Singapore'],['AE','United Arab Emirates'],['DE','Germany'],['FR','France'],['ES','Spain'],['IT','Italy'],['NL','Netherlands'],['SE','Sweden'],['BR','Brazil'],['MX','Mexico']] as const;
   return <div className="mx-auto max-w-[900px] px-5 py-9 sm:px-8 lg:px-12">
     <PageIntro eyebrow="Preferences" title="Make it yours." description="Choose your viewing room and the market used for availability." />
     <div className="space-y-4">
       <div className="panel rounded-2xl p-5 sm:p-7">
         <div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Profile</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your details</h2></div>
         <label className="mb-5 block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Name</span><input value={profile.username} onChange={(e) => updateProfile({ username: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="input-profile-name" /></label>
-        <label className="block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Country or region</span><select value={profile.country} onChange={(e) => updateProfile({ country: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="select-profile-country">{countries.map((country) => <option key={country}>{country}</option>)}</select><span className="mt-2 block text-[10px] leading-5 text-[#747687]">Availability is currently curated sample data and will use this market when live provider data is connected.</span></label>
+        <label className="block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Country or region</span><select value={profile.country} onChange={(e) => updateProfile({ country: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="select-profile-country">{countries.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select><span className="mt-2 block text-[10px] leading-5 text-[#747687]">Availability uses this market for regional provider data when live provider data is connected; curated titles never claim an unverified provider.</span></label>
       </div>
       <div className="panel rounded-2xl p-5 sm:p-7">
         <div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Appearance</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your viewing room</h2></div>
