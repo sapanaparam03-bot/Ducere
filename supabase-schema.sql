@@ -28,7 +28,9 @@ create table if not exists public.user_titles (
 alter table public.profiles enable row level security;
 alter table public.user_titles enable row level security;
 
+drop policy if exists "profiles own row" on public.profiles;
 create policy "profiles own row" on public.profiles for all using (auth.uid() = id) with check (auth.uid() = id);
+drop policy if exists "titles own rows" on public.user_titles;
 create policy "titles own rows" on public.user_titles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
