@@ -10,10 +10,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
-    if (!supabase) { setLoading(false); return; }
+    const client = supabase;
+    if (!client) { setLoading(false); return; }
     let active = true;
-    supabase.auth.getSession().then(({ data }) => { if (active) { setSession(data.session); setLoading(false); } });
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    client.auth.getSession().then(({ data }) => { if (active) { setSession(data.session); setLoading(false); } });
+    const { data } = client.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => { active = false; data.subscription.unsubscribe(); };
   }, []);
   if (!supabase) return <>{children}</>;
@@ -21,7 +22,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   if (session) return <>{children}</>;
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setMessage('');
-    const result = mode === 'signin' ? await supabase.auth.signInWithPassword({ email: email.trim(), password }) : await supabase.auth.signUp({ email: email.trim(), password });
+    const client = supabase;
+    if (!client) { setBusy(false); return; }
+    const result = mode === 'signin' ? await client.auth.signInWithPassword({ email: email.trim(), password }) : await client.auth.signUp({ email: email.trim(), password });
     if (result.error) setMessage(result.error.message); else setMessage(mode === 'signup' ? 'Account created. Check your email if confirmation is required.' : 'Signed in.');
     setBusy(false);
   };
