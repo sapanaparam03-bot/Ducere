@@ -157,10 +157,30 @@ export async function loadLiveCatalog(): Promise<Title[]> {
   const cached = readCache();
   if (cached?.length) return cached;
 
-  const tmdbPromise = tmdbToken ? tmdbFetch<TmdbTrending>('/trending/all/week?language=en-US') : Promise.resolve({ results: [] } as TmdbTrending);\n\n  const tvPages = await Promise.all(\n    Array.from({ length: 5 }, (_, page) => fetchJson<TvMazeShow[]>(`https://api.tvmaze.com/shows?page=${page}`)),
-  );
-  const animePage = await fetchJson<{ data?: JikanAnime[] }>('https://api.jikan.moe/v4/top/anime?limit=25');
-  const tmdb = await tmdbPromise;\n  const remoteTitles = [\n    ...(tmdb.results ?? []).filter((item) => item.media_type === 'movie' || item.media_type === 'tv').map(tmdbTitle),\n    ...tvPages.flat().map(tvMazeTitle),\n    ...(animePage.data ?? []).map(jikanTitle),\n  ];
+  const [tmdbResult, tvResult, animeResult] = await Promise.allSettled([
+    tmdbToken
+      ? tmdbFetch<TmdbTrending>('/trending/all/week?language=en-US')
+      : Promise.resolve({ results: [] } as TmdbTrending),
+    Promise.all(
+      Array.from({ length: 5 }, (_, page) =>
+        fetchJson<TvMazeShow[]>(`https://api.tvmaze.com/shows?page=${page}`),
+      ),
+    ),
+    fetchJson<{ data?: JikanAnime[] }>('https://api.jikan.moe/v4/top/anime?limit=25'),
+  ]);
+
+  const tmdb = tmdbResult.status === 'fulfilled' ? tmdbResult.value : { results: [] };
+  const tvPages = tvResult.status === 'fulfilled' ? tvResult.value : [];
+  const animePage = animeResult.status === 'fulfilled' ? animeResult.value : { data: [] };
+
+  const remoteTitles = [
+    ...(tmdb.results ?? [])
+      .filter((item) => item.media_type === 'movie' || item.media_type === 'tv')
+      .map(tmdbTitle),
+    ...tvPages.flat().map(tvMazeTitle),
+    ...(animePage.data ?? []).map(jikanTitle),
+  ];
+
   const seen = new Set<string>();
   const merged = [...TITLES, ...remoteTitles].filter((title) => {
     if (seen.has(title.id)) return false;
