@@ -27,6 +27,17 @@ type JikanAnime = {
 };
 
 
+const CACHE_KEY = 'ducere-live-catalog-v3';
+const CACHE_TTL = 1000 * 60 * 60 * 12;
+
+const stripMarkup = (value: string | null | undefined) =>
+  (value ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+
+const yearFrom = (value: string | null | undefined) => {
+  const year = Number(value?.slice(0, 4));
+  return Number.isFinite(year) ? year : 0;
+};
+
 const tvMazeTitle = (show: TvMazeShow): Title => {
   const provider = show.network?.name ?? show.webChannel?.name ?? (show.language ? `${show.language} catalog` : 'TVMaze catalog');
   return {
