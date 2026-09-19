@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { INITIAL_PROFILE, INITIAL_USER_TITLES, type Profile, type UserStatus, type UserTitle } from '@/lib/ducere';
+import { INITIAL_PROFILE, type Profile, type UserStatus, type UserTitle } from '@/lib/ducere';
 import { supabase } from '@/lib/supabase';
 
 const USER_KEY = 'ducere-user-titles-v2';
