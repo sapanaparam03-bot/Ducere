@@ -16,6 +16,31 @@ import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } f
 import { fetchWatchProvidersByTitle } from '@/lib/tmdb';
 import { supabase } from '@/lib/supabase';
 
+
+function parseCsv(text: string): Record<string, string>[] {
+  const rows: string[][] = []; let row: string[] = []; let cell = ''; let quoted = false;
+  for (let i = 0; i < text.length; i++) { const ch = text[i], next = text[i + 1]; if (ch === '"' && quoted && next === '"') { cell += '"'; i++; } else if (ch === '"') quoted = !quoted; else if (ch === ',' && !quoted) { row.push(cell); cell = ''; } else if ((ch === '\n' || ch === '\r') && !quoted) { if (ch === '\r' && next === '\n') i++; row.push(cell); if (row.some((v) => v.trim())) rows.push(row); row = []; cell = ''; } else cell += ch; }
+  if (cell || row.length) { row.push(cell); if (row.some((v) => v.trim())) rows.push(row); }
+  const headers = (rows.shift() ?? []).map((h) => h.trim().toLowerCase());
+  return rows.map((values) => Object.fromEntries(headers.map((h, i) => [h, (values[i] ?? '').trim()])));
+}
+const normalizeImportTitle = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const importRows = (rows: Record<string, string>[], catalog: Title[]) => {
+  const byName = new Map(catalog.map((title) => [normalizeImportTitle(title.name), title]));
+  return rows.flatMap((row) => {
+    const rawName = row['title'] || row['name'] || row['title name'] || row['anime title'] || '';
+    const title = byName.get(normalizeImportTitle(rawName));
+    if (!title) return [];
+    const rawStatus = (row['status'] || '').toLowerCase();
+    const watched = rawStatus.includes('completed') || rawStatus.includes('watched') || Boolean(row['watched date'] || row['date watched'] || row['date rated']);
+    const watching = rawStatus.includes('watching') || rawStatus.includes('currently watching');
+    const status: UserStatus = watching ? 'watching' : watched ? 'watched' : 'watchlist';
+    const ratingValue = Number(row['your rating'] || row['score'] || row['rating'] || '');
+    const episodeValue = Number(row['episodes watched'] || row['episodes watched'] || '');
+    return [{ titleId: title.id, status, dateAdded: row['date added'] || row['date'] || new Date().toISOString().slice(0, 10), ...(watched ? { dateWatched: row['watched date'] || row['date watched'] || row['date rated'] || undefined, progress: 100 } : {}), ...(Number.isFinite(ratingValue) && ratingValue > 0 ? { rating: Math.max(1, Math.min(5, Math.round(ratingValue / 2))) } : {}), ...(Number.isFinite(episodeValue) && episodeValue > 0 && title.type !== 'movie' ? { currentEpisode: Math.floor(episodeValue), currentSeason: 1, progress: watched ? 100 : undefined } : {}) } as UserTitle];
+  });
+};
+
 const queryClient = new QueryClient();
 
 const navItems = [
@@ -336,6 +361,7 @@ function SettingsPageV2({ profile, updateProfile, resetData }: DucereProps) {
         <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Notifications & privacy</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Keep the quiet</h2></div>
         <div className="divide-y divide-[#303244]"><SettingSwitch label="Weekly viewing note" copy="A gentle reminder of what is still waiting in your queue." value={notifications} onChange={setNotifications} testId="switch-notifications" /><SettingSwitch label="Private archive" copy="Your library stays in this browser and is never shared." value={privateArchive} onChange={setPrivateArchive} testId="switch-private-archive" /></div>
       </div>
+      <ImportPanel catalog={catalog} upsert={upsert} />
       <div className="panel rounded-2xl p-5 sm:p-7">
         <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Data</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your archive, your rules</h2></div>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p className="text-xs font-semibold text-[#c1b9b5]">Reset local archive</p><p className="mt-1 text-[10px] text-[#747687]">Restore the sample shelf and remove your changes from this browser.</p></div><button onClick={() => { if (window.confirm('Reset your local archive?')) resetData(); }} className="flex items-center gap-2 self-start rounded-lg border border-[#633e42] px-3 py-2 text-[11px] font-semibold text-[#df8178] hover:bg-[#633e42]/20" data-testid="button-reset-data"><RotateCcw size={14} /> Reset data</button></div>
@@ -345,7 +371,7 @@ function SettingsPageV2({ profile, updateProfile, resetData }: DucereProps) {
   </div>;
 }
 
-function SettingsPageV3({ profile, updateProfile, resetData }: DucereProps) {
+function SettingsPageV3({ profile, updateProfile, resetData, upsert, catalog }: DucereProps) {
   const countries = [['US','United States'],['IN','India'],['CA','Canada'],['GB','United Kingdom'],['AU','Australia'],['NZ','New Zealand'],['JP','Japan'],['KR','South Korea'],['SG','Singapore'],['AE','United Arab Emirates'],['DE','Germany'],['FR','France'],['ES','Spain'],['IT','Italy'],['NL','Netherlands'],['SE','Sweden'],['BR','Brazil'],['MX','Mexico']] as const;
   return <div className="mx-auto max-w-[900px] px-5 py-9 sm:px-8 lg:px-12">
     <PageIntro eyebrow="Preferences" title="Make it yours." description="Choose your viewing room and the market used for availability." />
@@ -364,6 +390,24 @@ function SettingsPageV3({ profile, updateProfile, resetData }: DucereProps) {
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p className="text-xs font-semibold text-[#c1b9b5]">Reset local archive</p><p className="mt-1 text-[10px] text-[#747687]">Restore the full sample shelf and remove your changes from this browser.</p></div><button onClick={() => { if (window.confirm('Reset your local archive?')) resetData(); }} className="flex items-center gap-2 self-start rounded-lg border border-[#633e42] px-3 py-2 text-[11px] font-semibold text-[#df8178] hover:bg-[#633e42]/20" data-testid="button-reset-data"><RotateCcw size={14} /> Reset data</button></div>
       </div>
     </div>
+  </div>;
+}
+
+
+function ImportPanel({ catalog, upsert }: { catalog: Title[]; upsert: DucereProps['upsert'] }) {
+  const [message, setMessage] = useState('');
+  const handleFile = async (file: File) => {
+    try {
+      const rows = parseCsv(await file.text());
+      const imported = importRows(rows, catalog);
+      imported.forEach((item) => upsert(item.titleId, item));
+      setMessage(imported.length ? `Imported ${imported.length} matching title${imported.length === 1 ? '' : 's'}.` : 'No catalogue matches were found in this file.');
+    } catch { setMessage('Could not read this CSV file.'); }
+  };
+  return <div className="panel rounded-2xl p-5 sm:p-7">
+    <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Import</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Bring your archive with you</h2><p className="mt-2 max-w-xl text-[11px] leading-5 text-[#77798a]">Import CSV exports from IMDb, Letterboxd, or MyAnimeList. Ducere matches titles it recognizes and leaves unmatched rows untouched.</p></div>
+    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#e47a58] px-4 py-2.5 text-xs font-bold text-[#211923]"><span>Choose CSV</span><input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFile(file); e.currentTarget.value = ''; }} data-testid="input-import-csv" /></label>
+    {message && <p className="mt-3 text-[11px] text-[#87bd9d]" data-testid="text-import-result">{message}</p>}
   </div>;
 }
 
