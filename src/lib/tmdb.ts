@@ -26,21 +26,22 @@ type SearchResponse = { results?: Array<{ id: number; media_type?: string }> };
 export type WatchProviderResponse = { results: Record<string, { flatrate?: ProviderRow[]; free?: ProviderRow[]; rent?: ProviderRow[]; buy?: ProviderRow[]; link?: string }> };
 type ProviderRow = { provider_id: number; provider_name: string; logo_path: string | null; display_priority: number };
 
-export async function fetchWatchProvidersByTitle(name: string, type: TitleType, region = defaultRegion): Promise<Provider[]> {
+export async function fetchWatchProvidersByTitle(name: string, type: TitleType, region = defaultRegion, titleId?: string): Promise<Provider[]> {
   const market = normalizeRegion(region);
   if (!token || !name.trim()) return [];
   try {
     const media = type === 'movie' ? 'movie' : 'tv';
-    const search = await tmdbFetch<SearchResponse>(`/search/${media}?query=${encodeURIComponent(name)}&include_adult=false&language=en-US&page=1`);
-    const match = search.results?.[0];
-    if (!match) return [];
-    const data = await tmdbFetch<WatchProviderResponse>(`/${media}/${match.id}/watch/providers`);
+    const tmdbId = titleId?.match(/^tmdb-(movie|tv)-(\\d+)$/)?.[2];
+    const matchId = tmdbId ?? (await tmdbFetch<SearchResponse>(`/search/${media}?query=${encodeURIComponent(name)}&include_adult=false&language=en-US&page=1`)).results?.[0]?.id;
+    if (!matchId) return [];
+    const data = await tmdbFetch<WatchProviderResponse>(`/${media}/${matchId}/watch/providers`);
     return providerRows(data, market);
   } catch { return []; }
 }
 
 export function providerRows(data: WatchProviderResponse | null, region = defaultRegion): Provider[] {
-  const row = data?.results?.[region];
+  const market = normalizeRegion(region);
+  const row = data?.results?.[market];
   if (!row) return [];
   const groups: Array<[ProviderRow[] | undefined, Provider['kind']]> = [[row.flatrate, 'streaming'], [row.free, 'free'], [row.rent, 'rent'], [row.buy, 'buy']];
   return groups.flatMap(([items, kind]) => (items ?? []).map((item) => ({ name: item.provider_name, kind, logo: img(item.logo_path, 'w92'), url: row.link }))).filter((item, index, all) => all.findIndex((x) => x.name === item.name && x.kind === item.kind) === index);
