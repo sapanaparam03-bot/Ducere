@@ -271,7 +271,7 @@ function TitleDetails({ title, getUserTitle, upsert, setStatus, remove, profile 
   useEffect(() => {
     let cancelled = false;
     setProviderLoading(true);
-    fetchWatchProvidersByTitle(title.name, title.type, profile.country).then((providers) => {
+    fetchWatchProvidersByTitle(title.name, title.type, profile.country, title.id).then((providers) => {
       if (!cancelled && providers.length) setLiveProviders(providers);
     }).finally(() => { if (!cancelled) setProviderLoading(false); });
     return () => { cancelled = true; };
