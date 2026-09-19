@@ -2,6 +2,16 @@ import type { Provider, TitleType } from './ducere';
 
 const token = import.meta.env.VITE_TMDB_READ_TOKEN as string | undefined;
 const defaultRegion = (import.meta.env.VITE_TMDB_REGION as string | undefined) || 'IN';
+
+const REGION_ALIASES: Record<string, string> = {
+  'United States': 'US', 'India': 'IN', 'Canada': 'CA', 'United Kingdom': 'GB',
+  'Australia': 'AU', 'New Zealand': 'NZ', 'Japan': 'JP', 'South Korea': 'KR',
+  'Singapore': 'SG', 'United Arab Emirates': 'AE', 'Germany': 'DE', 'France': 'FR',
+  'Spain': 'ES', 'Italy': 'IT', 'Netherlands': 'NL', 'Sweden': 'SE',
+  'Brazil': 'BR', 'Mexico': 'MX',
+};
+
+const normalizeRegion = (region: string) => REGION_ALIASES[region] ?? region.trim().toUpperCase();
 const base = 'https://api.themoviedb.org/3';
 const img = (path: string | null | undefined, size = 'w500') => path ? `https://image.tmdb.org/t/p/${size}${path}` : '';
 
@@ -17,6 +27,7 @@ export type WatchProviderResponse = { results: Record<string, { flatrate?: Provi
 type ProviderRow = { provider_id: number; provider_name: string; logo_path: string | null; display_priority: number };
 
 export async function fetchWatchProvidersByTitle(name: string, type: TitleType, region = defaultRegion): Promise<Provider[]> {
+  const market = normalizeRegion(region);
   if (!token || !name.trim()) return [];
   try {
     const media = type === 'movie' ? 'movie' : 'tv';
@@ -24,7 +35,7 @@ export async function fetchWatchProvidersByTitle(name: string, type: TitleType, 
     const match = search.results?.[0];
     if (!match) return [];
     const data = await tmdbFetch<WatchProviderResponse>(`/${media}/${match.id}/watch/providers`);
-    return providerRows(data, region);
+    return providerRows(data, market);
   } catch { return []; }
 }
 
