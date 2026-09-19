@@ -129,7 +129,19 @@ export function useDucere() {
 
   const remove = useCallback((titleId: string) => {
     setUserTitles((current) => current.filter((item) => item.titleId !== titleId));
-    if (userId && supabase) void supabase.from('user_titles').delete().eq('user_id', userId).eq('title_id', titleId).then(({ error }) => { if (error) console.error('Ducere: failed to remove title', error); });
+    if (userId && supabase) {
+      void supabase
+        .from('user_titles')
+        .delete()
+        .eq('user_id', userId)
+        .eq('title_id', titleId)
+        .then(({ error }) => {
+          if (error) {
+            console.error('Ducere: failed to remove title', error);
+            setDataError('Some changes could not be saved. Please retry.');
+          }
+        });
+    }
   }, [userId]);
 
   const setStatus = useCallback((titleId: string, status: UserStatus) => {
