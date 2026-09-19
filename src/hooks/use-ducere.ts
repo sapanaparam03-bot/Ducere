@@ -208,5 +208,5 @@ export function useDucere() {
     watched: userTitles.filter((item) => item.status === 'watched').length,
   }), [userTitles]);
 
-  return { userTitles, profile, ready, userId, dataError, getUserTitle, upsert, remove, setStatus, setProgress, updateProfile, resetData, counts };
+  return { userTitles, profile, ready, userId, dataError, getUserTitle, upsert, remove, setStatus, setProgress, setEpisodeProgress, updateProfile, resetData, counts };
 }
