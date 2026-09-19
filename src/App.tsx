@@ -221,12 +221,28 @@ function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalo
     [catalog, search, type],
   );
   const visible = results.slice(0, visibleCount);
+  const likedGenres = useMemo(() => {
+    const watchedOrWatching = userTitles.filter((item) => item.status !== 'watchlist');
+    const counts = new Map<string, number>();
+    watchedOrWatching.forEach((item) => {
+      const title = findTitle(catalog, item.titleId);
+      title?.genres.forEach((genre) => counts.set(genre, (counts.get(genre) ?? 0) + 1));
+    });
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([genre]) => genre);
+  }, [userTitles, catalog]);
+  const recommendations = useMemo(() => catalog
+    .filter((title) => !userTitles.some((item) => item.titleId === title.id))
+    .map((title) => ({ title, score: title.genres.reduce((sum, genre) => sum + (likedGenres.includes(genre) ? 3 : 0), 0) + title.rating }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6)
+    .map(({ title }) => title), [catalog, userTitles, likedGenres]);
   return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12">
     <PageIntro eyebrow="Discover" title="Find your next film." description="A curated shelf backed by a growing live index of series and anime. Search by title, genre, or mood." />
     <div className="mb-10 flex flex-col gap-3 sm:flex-row">
       <div className="relative flex-1"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777989]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Try “quiet sci-fi” or “Breaking Bad”" className="h-12 w-full rounded-xl border border-[#303345] bg-[#171a27] pl-11 pr-4 text-sm outline-none placeholder:text-[#686a7a] focus:border-[#d17459]" data-testid="input-discover-search" /></div>
       <div className="flex gap-2 overflow-x-auto">{(['all', 'movie', 'tv', 'anime'] as const).map((filter) => <button key={filter} onClick={() => setType(filter)} className={`rounded-xl px-4 py-2 text-[11px] font-bold capitalize transition ${type === filter ? 'bg-[#e47a58] text-[#211923]' : 'border border-[#303345] text-[#9495a3] hover:border-[#765045]'}`} data-testid={`button-filter-${filter}`}>{filter === 'all' ? 'Everything' : filter === 'tv' ? 'Series' : filter}</button>)}</div>
     </div>
+    {!search && type === 'all' && recommendations.length > 0 && <section className="mb-10"><SectionHeading eyebrow="For your taste" title={likedGenres.length ? "Because you watch " + likedGenres[0] : 'A few places to start'} /><div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">{recommendations.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div></section>}
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-[#777989]"><span className="font-bold text-[#e2d8c8]">{results.length}</span> titles indexed{catalogLoading ? ' · loading more from live sources' : ''}</p><span className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#666879]">Curated + live catalog</span></div>
     {catalogError && <div className="mb-5 rounded-xl border border-[#6a493f] bg-[#31252a] px-4 py-3 text-xs text-[#c6aaa1]">{catalogError}</div>}
     {visible.length ? <><div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{visible.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div>{visible.length < results.length && <div className="flex justify-center py-12"><button onClick={() => setVisibleCount((current) => current + 96)} className="rounded-xl border border-[#6a4038] px-5 py-3 text-xs font-bold text-[#e78b6c] transition hover:bg-[#e47a58]/10" data-testid="button-load-more">Load more titles <span className="ml-1 text-[#9c7f77]">({results.length - visible.length} remaining)</span></button></div>}</> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}
