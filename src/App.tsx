@@ -116,6 +116,7 @@ function Shell({ profileName, counts, onSignOut }: { profileName: string; counts
         <div className="mt-auto space-y-1">
           <Link href="/profile" className={`nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold ${location.startsWith('/profile') ? 'bg-[#272231] text-[#f2dfc5]' : 'text-[#9293a3] hover:bg-[#191b28]'}`} data-testid="link-nav-profile"><UserRound size={17} /><span>Profile</span></Link>
           <Link href="/settings" className={`nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold ${location.startsWith('/settings') ? 'bg-[#272231] text-[#f2dfc5]' : 'text-[#9293a3] hover:bg-[#191b28]'}`} data-testid="link-nav-settings"><Settings size={17} /><span>Settings</span></Link>
+          <button onClick={onSignOut} className="nav-link flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-[#9293a3] hover:bg-[#191b28] hover:text-[#e8dece]" data-testid="button-sign-out"><Trash2 size={17} /><span>Sign out</span></button>
           <div className="mt-5 border-t hairline pt-5">
             <Link href="/profile" className="flex items-center gap-3 rounded-xl px-2 py-2" data-testid="link-sidebar-profile">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d5af71] font-display text-sm font-bold text-[#1b1820]">{profileName[0]}</span>
