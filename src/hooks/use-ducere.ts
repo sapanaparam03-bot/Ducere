@@ -44,9 +44,11 @@ export function useDucere() {
   const [profile, setProfile] = useState<Profile>(() => read(PROFILE_KEY, INITIAL_PROFILE));
   const [ready, setReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   const loadSessionData = useCallback(async (uid: string | null) => {
     setUserId(uid);
+    setDataError(null);
     if (!uid || !supabase) {
       setUserTitles([]);
       setProfile(INITIAL_PROFILE);
@@ -60,6 +62,10 @@ export function useDucere() {
       supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
     ]);
 
+    if (titlesResult.error || profileResult.error) {
+      console.error('Ducere: failed to load account data', { titles: titlesResult.error, profile: profileResult.error });
+      setDataError('We could not fully load your archive. Your local session is still available; please retry if data looks incomplete.');
+    }
     setUserTitles(!titlesResult.error ? (titlesResult.data ?? []).map(fromDb) : []);
     setProfile(
       !profileResult.error && profileResult.data
@@ -101,7 +107,10 @@ export function useDucere() {
   const persist = useCallback(async (item: UserTitle) => {
     if (userId && supabase) {
       const { error } = await supabase.from('user_titles').upsert(toDb(userId, item), { onConflict: 'user_id,title_id' });
-      if (error) console.error('Ducere: failed to save title', error);
+      if (error) {
+        console.error('Ducere: failed to save title', error);
+        setDataError('Some changes could not be saved. Please retry.');
+      }
     }
   }, [userId]);
 
@@ -155,7 +164,12 @@ export function useDucere() {
           country: next.country,
           appearance: next.appearance,
           updated_at: new Date().toISOString(),
-        }).then(({ error }) => { if (error) console.error('Ducere: failed to save profile', error); });
+        }).then(({ error }) => {
+          if (error) {
+            console.error('Ducere: failed to save profile', error);
+            setDataError('Some profile changes could not be saved. Please retry.');
+          }
+        });
       }
       return next;
     });
@@ -163,10 +177,16 @@ export function useDucere() {
 
   const resetData = useCallback(async () => {
     if (userId && supabase) {
-      await supabase.from('user_titles').delete().eq('user_id', userId);
+      const { error } = await supabase.from('user_titles').delete().eq('user_id', userId);
+      if (error) {
+        console.error('Ducere: failed to reset archive', error);
+        setDataError('Your archive could not be reset. Please try again.');
+        return;
+      }
     }
     setUserTitles([]);
     setProfile(INITIAL_PROFILE);
+    setDataError(null);
   }, [userId]);
 
   const counts = useMemo(() => ({
@@ -176,5 +196,5 @@ export function useDucere() {
     watched: userTitles.filter((item) => item.status === 'watched').length,
   }), [userTitles]);
 
-  return { userTitles, profile, ready, userId, getUserTitle, upsert, remove, setStatus, setProgress, updateProfile, resetData, counts };
+  return { userTitles, profile, ready, userId, dataError, getUserTitle, upsert, remove, setStatus, setProgress, updateProfile, resetData, counts };
 }
