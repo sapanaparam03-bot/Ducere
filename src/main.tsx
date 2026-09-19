@@ -6,11 +6,7 @@ import { AuthGate } from '@/components/auth-gate';
 
 import './index.css';
 
-createRoot(document.getElementById('root')!, {
-  onCaughtError: (error, errorInfo) => {
-    console.error(error, errorInfo.componentStack);
-  },
-}).render(
+createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
     <AuthGate>
       <App />
