@@ -40,7 +40,7 @@ const fromDb = (row: any): UserTitle => ({
 });
 
 export function useDucere() {
-  const [userTitles, setUserTitles] = useState<UserTitle[]>(() => read(USER_KEY, INITIAL_USER_TITLES));
+  const [userTitles, setUserTitles] = useState<UserTitle[]>([]);
   const [profile, setProfile] = useState<Profile>(() => read(PROFILE_KEY, INITIAL_PROFILE));
   const [ready, setReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -100,7 +100,8 @@ export function useDucere() {
 
   const persist = useCallback(async (item: UserTitle) => {
     if (userId && supabase) {
-      await supabase.from('user_titles').upsert(toDb(userId, item), { onConflict: 'user_id,title_id' });
+      const { error } = await supabase.from('user_titles').upsert(toDb(userId, item), { onConflict: 'user_id,title_id' });
+      if (error) console.error('Ducere: failed to save title', error);
     }
   }, [userId]);
 
@@ -119,7 +120,7 @@ export function useDucere() {
 
   const remove = useCallback((titleId: string) => {
     setUserTitles((current) => current.filter((item) => item.titleId !== titleId));
-    if (userId && supabase) void supabase.from('user_titles').delete().eq('user_id', userId).eq('title_id', titleId);
+    if (userId && supabase) void supabase.from('user_titles').delete().eq('user_id', userId).eq('title_id', titleId).then(({ error }) => { if (error) console.error('Ducere: failed to remove title', error); });
   }, [userId]);
 
   const setStatus = useCallback((titleId: string, status: UserStatus) => {
@@ -144,7 +145,7 @@ export function useDucere() {
           country: next.country,
           appearance: next.appearance,
           updated_at: new Date().toISOString(),
-        });
+        }).then(({ error }) => { if (error) console.error('Ducere: failed to save profile', error); });
       }
       return next;
     });
