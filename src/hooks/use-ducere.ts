@@ -135,6 +135,16 @@ export function useDucere() {
     upsert(titleId, { progress: safeProgress, ...(safeProgress >= 100 ? { status: 'watched', dateWatched: new Date().toISOString().slice(0, 10) } : { status: 'watching' }) });
   }, [upsert]);
 
+  const setEpisodeProgress = useCallback((titleId: string, season: number, episode: number) => {
+    const safeSeason = Math.max(1, Math.floor(season));
+    const safeEpisode = Math.max(1, Math.floor(episode));
+    upsert(titleId, {
+      status: 'watching',
+      currentSeason: safeSeason,
+      currentEpisode: safeEpisode,
+    });
+  }, [upsert]);
+
   const updateProfile = useCallback((patch: Partial<Profile>) => {
     setProfile((current) => {
       const next = { ...current, ...patch };
