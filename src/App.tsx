@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { AuthScreen } from '@/components/auth-screen';
 import { useDucere } from '@/hooks/use-ducere';
 import { useCatalog } from '@/hooks/use-catalog';
 import { formatStatus, titleById, TITLES, type Title, type TitleType, type UserStatus } from '@/lib/ducere';
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import { fetchWatchProvidersByTitle } from '@/lib/tmdb';
+import { supabase } from '@/lib/supabase';
 
 const queryClient = new QueryClient();
 
@@ -54,10 +56,19 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 function DucereApp() {
   const ducere = useDucere();
   const liveCatalog = useCatalog();
+
+  if (!ducere.ready) {
+    return <div className="flex min-h-[100dvh] items-center justify-center bg-[#0d0f18] text-[#777989]">Loading your cinema…</div>;
+  }
+
+  if (!ducere.userId) {
+    return <AuthScreen />;
+  }
+
   const shared = { ...ducere, catalog: liveCatalog.titles, catalogLoading: liveCatalog.loading, catalogError: liveCatalog.error };
   return (
     <div className="film-grain app-shell min-h-[100dvh]">
-      <Shell profileName={ducere.profile.username} counts={ducere.counts} />
+      <Shell profileName={ducere.profile.username} counts={ducere.counts} onSignOut={() => void supabase?.auth.signOut()} />
       <main className="min-h-[100dvh] pb-24 md:ml-[248px] md:pb-0">
         <Switch>
           <Route path="/" component={() => <HomePage {...shared} />} />
@@ -76,7 +87,7 @@ function DucereApp() {
   );
 }
 
-function Shell({ profileName, counts }: { profileName: string; counts: { watchlist: number; watching: number } }) {
+function Shell({ profileName, counts, onSignOut }: { profileName: string; counts: { watchlist: number; watching: number }; onSignOut: () => void }) {
   const todayLabel = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
   const [location, setLocation] = useLocation();
   const [query, setQuery] = useState('');
