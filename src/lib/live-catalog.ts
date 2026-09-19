@@ -27,66 +27,6 @@ type JikanAnime = {
 };
 
 
-const tmdbToken = import.meta.env.VITE_TMDB_READ_TOKEN as string | undefined;
-const tmdbImage = (path: string | null | undefined, size = 'w500') => path ? `https://image.tmdb.org/t/p/${size}${path}` : '';
-
-type TmdbMedia = {
-  id: number;
-  title?: string;
-  name?: string;
-  overview?: string;
-  poster_path?: string | null;
-  backdrop_path?: string | null;
-  release_date?: string;
-  first_air_date?: string;
-  vote_average?: number;
-  genre_ids?: number[];
-  media_type?: 'movie' | 'tv';
-};
-
-type TmdbTrending = { results?: TmdbMedia[] };
-
-const tmdbFetch = async <T,>(path: string): Promise<T> => {
-  if (!tmdbToken) throw new Error('TMDB is not configured');
-  const response = await fetch(`https://api.themoviedb.org/3${path}`, {
-    headers: { Authorization: `Bearer ${tmdbToken}`, accept: 'application/json' },
-  });
-  if (!response.ok) throw new Error(`TMDB catalog source returned ${response.status}`);
-  return response.json() as Promise<T>;
-};
-
-const tmdbTitle = (item: TmdbMedia): Title => {
-  const type = item.media_type === 'movie' ? 'movie' : 'tv';
-  const name = item.title ?? item.name ?? 'Untitled';
-  const date = item.release_date ?? item.first_air_date;
-  return {
-    id: `tmdb-${type}-${item.id}`,
-    name,
-    type,
-    poster: tmdbImage(item.poster_path) || coverArt(name, type),
-    backdrop: tmdbImage(item.backdrop_path, 'w1280') || coverArt(name, type),
-    description: item.overview?.trim() || 'A title from the live TMDB catalog.',
-    releaseYear: yearFrom(date),
-    genres: type === 'movie' ? ['Movie'] : ['Series'],
-    rating: Math.round((item.vote_average ?? 0) * 10) / 10,
-    runtime: type === 'movie' ? 'Movie' : 'Series',
-    cast: [],
-    director: 'TMDB catalog',
-    providers: [],
-  };
-};
-
-const CACHE_KEY = 'ducere-live-catalog-v2';
-const CACHE_TTL = 1000 * 60 * 60 * 12;
-
-const stripMarkup = (value: string | null | undefined) =>
-  (value ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-
-const yearFrom = (value: string | null | undefined) => {
-  const year = Number(value?.slice(0, 4));
-  return Number.isFinite(year) ? year : 0;
-};
-
 const tvMazeTitle = (show: TvMazeShow): Title => {
   const provider = show.network?.name ?? show.webChannel?.name ?? (show.language ? `${show.language} catalog` : 'TVMaze catalog');
   return {
@@ -157,26 +97,19 @@ export async function loadLiveCatalog(): Promise<Title[]> {
   const cached = readCache();
   if (cached?.length) return cached;
 
-  const [tmdbResult, tvResult, animeResult] = await Promise.allSettled([
-    tmdbToken
-      ? tmdbFetch<TmdbTrending>('/trending/all/week?language=en-US')
-      : Promise.resolve({ results: [] } as TmdbTrending),
+  const [tvResult, animeResult] = await Promise.allSettled([
     Promise.all(
-      Array.from({ length: 5 }, (_, page) =>
+      Array.from({ length: 8 }, (_, page) =>
         fetchJson<TvMazeShow[]>(`https://api.tvmaze.com/shows?page=${page}`),
       ),
     ),
-    fetchJson<{ data?: JikanAnime[] }>('https://api.jikan.moe/v4/top/anime?limit=25'),
+    fetchJson<{ data?: JikanAnime[] }>('https://api.jikan.moe/v4/top/anime?limit=50'),
   ]);
 
-  const tmdb = tmdbResult.status === 'fulfilled' ? tmdbResult.value : { results: [] };
   const tvPages = tvResult.status === 'fulfilled' ? tvResult.value : [];
   const animePage = animeResult.status === 'fulfilled' ? animeResult.value : { data: [] };
 
   const remoteTitles = [
-    ...(tmdb.results ?? [])
-      .filter((item) => item.media_type === 'movie' || item.media_type === 'tv')
-      .map(tmdbTitle),
     ...tvPages.flat().map(tvMazeTitle),
     ...(animePage.data ?? []).map(jikanTitle),
   ];
