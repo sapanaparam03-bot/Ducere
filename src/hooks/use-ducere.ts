@@ -129,6 +129,11 @@ export function useDucere() {
     });
   }, [upsert]);
 
+  const setProgress = useCallback((titleId: string, progress: number) => {
+    const safeProgress = Math.max(0, Math.min(100, Math.round(progress)));
+    upsert(titleId, { progress: safeProgress, ...(safeProgress >= 100 ? { status: 'watched', dateWatched: new Date().toISOString().slice(0, 10) } : { status: 'watching' }) });
+  }, [upsert]);
+
   const updateProfile = useCallback((patch: Partial<Profile>) => {
     setProfile((current) => {
       const next = { ...current, ...patch };
@@ -160,5 +165,5 @@ export function useDucere() {
     watched: userTitles.filter((item) => item.status === 'watched').length,
   }), [userTitles]);
 
-  return { userTitles, profile, ready, userId, getUserTitle, upsert, remove, setStatus, updateProfile, resetData, counts };
+  return { userTitles, profile, ready, userId, getUserTitle, upsert, remove, setStatus, setProgress, updateProfile, resetData, counts };
 }
