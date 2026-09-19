@@ -1,0 +1,347 @@
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { useDucere } from '@/hooks/use-ducere';
+import { useCatalog } from '@/hooks/use-catalog';
+import { formatStatus, titleById, TITLES, type Title, type TitleType, type UserStatus } from '@/lib/ducere';
+import {
+  ArrowRight, Bookmark, Check, ChevronDown, ChevronRight, CirclePlay, Compass, Film,
+  History, Home, Library, MapPin, Moon, MoreHorizontal, PlayCircle, RotateCcw, Search,
+  Settings, SlidersHorizontal, Sparkles, Star, Trash2, UserRound, CheckCircle2
+} from 'lucide-react';
+import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
+import { fetchWatchProvidersByTitle } from '@/lib/tmdb';
+
+const queryClient = new QueryClient();
+
+const navItems = [
+  { href: '/', label: 'Home', icon: Home },
+  { href: '/discover', label: 'Discover', icon: Compass },
+  { href: '/library', label: 'Library', icon: Library },
+  { href: '/watchlist', label: 'Watchlist', icon: Bookmark },
+  { href: '/watching', label: 'Watching', icon: PlayCircle },
+  { href: '/history', label: 'History', icon: History },
+];
+
+const typeTint: Record<TitleType, string> = {
+  movie: 'from-[#5b263e] via-[#30263e] to-[#141a2a]',
+  tv: 'from-[#163e49] via-[#272e48] to-[#15182a]',
+  anime: 'from-[#5e3b26] via-[#38263b] to-[#17192b]',
+};
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+          <RoutedErrorBoundary>
+            <DucereApp />
+          </RoutedErrorBoundary>
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
+function RoutedErrorBoundary({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
+}
+
+function DucereApp() {
+  const ducere = useDucere();
+  const liveCatalog = useCatalog();
+  const shared = { ...ducere, catalog: liveCatalog.titles, catalogLoading: liveCatalog.loading, catalogError: liveCatalog.error };
+  return (
+    <div className="film-grain app-shell min-h-[100dvh]">
+      <Shell profileName={ducere.profile.username} counts={ducere.counts} />
+      <main className="min-h-[100dvh] pb-24 md:ml-[248px] md:pb-0">
+        <Switch>
+          <Route path="/" component={() => <HomePage {...shared} />} />
+          <Route path="/discover" component={() => <DiscoverPageV2 {...shared} />} />
+          <Route path="/library" component={() => <LibraryPage {...shared} />} />
+          <Route path="/watchlist" component={() => <CollectionPage {...shared} status="watchlist" />} />
+          <Route path="/watching" component={() => <CollectionPage {...shared} status="watching" />} />
+          <Route path="/history" component={() => <HistoryPage {...shared} />} />
+          <Route path="/title/:id" component={() => <TitleDetailsPage {...shared} />} />
+          <Route path="/profile" component={() => <ProfilePage {...shared} />} />
+          <Route path="/settings" component={() => <SettingsPageV3 {...shared} />} />
+          <Route component={NotFound} />
+        </Switch>
+      </main>
+    </div>
+  );
+}
+
+function Shell({ profileName, counts }: { profileName: string; counts: { watchlist: number; watching: number } }) {
+  const todayLabel = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
+  const [location, setLocation] = useLocation();
+  const [query, setQuery] = useState('');
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (query.trim()) setLocation(`/discover?q=${encodeURIComponent(query.trim())}`);
+  };
+  return (
+    <>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r hairline bg-[#0e101a]/95 px-5 py-6 backdrop-blur-xl md:flex">
+        <Link href="/" className="mb-12 flex items-center gap-3 px-2" data-testid="link-brand">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e47a58] text-[#17151f] shadow-[0_8px_22px_rgba(228,122,88,.23)]"><Film size={18} strokeWidth={2.4} /></span>
+          <span className="font-display text-[25px] tracking-[-.03em] text-[#f3e9d5]">ducere</span>
+        </Link>
+        <nav className="space-y-1" aria-label="Primary navigation">
+          <p className="mb-3 px-3 font-mono-ui text-[10px] uppercase tracking-[.22em] text-[#737689]">Your cinema</p>
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const active = href === '/' ? location === '/' : location.startsWith(href);
+            const count = label === 'Watchlist' ? counts.watchlist : label === 'Watching' ? counts.watching : undefined;
+            return <Link key={href} href={href} className={`nav-link flex items-center justify-between rounded-xl px-3 py-2.5 text-[13px] font-semibold ${active ? 'bg-[#272231] text-[#f2dfc5]' : 'text-[#9293a3] hover:bg-[#191b28] hover:text-[#e8dece]'}`} data-testid={`link-nav-${label.toLowerCase()}`}>
+              <span className="flex items-center gap-3"><Icon size={17} strokeWidth={active ? 2.25 : 1.8} /><span>{label}</span></span>
+              {count ? <span className={`font-mono-ui text-[10px] ${active ? 'text-[#e47a58]' : 'text-[#6b6d7c]'}`}>{count}</span> : null}
+            </Link>;
+          })}
+        </nav>
+        <div className="mt-auto space-y-1">
+          <Link href="/profile" className={`nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold ${location.startsWith('/profile') ? 'bg-[#272231] text-[#f2dfc5]' : 'text-[#9293a3] hover:bg-[#191b28]'}`} data-testid="link-nav-profile"><UserRound size={17} /><span>Profile</span></Link>
+          <Link href="/settings" className={`nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold ${location.startsWith('/settings') ? 'bg-[#272231] text-[#f2dfc5]' : 'text-[#9293a3] hover:bg-[#191b28]'}`} data-testid="link-nav-settings"><Settings size={17} /><span>Settings</span></Link>
+          <div className="mt-5 border-t hairline pt-5">
+            <Link href="/profile" className="flex items-center gap-3 rounded-xl px-2 py-2" data-testid="link-sidebar-profile">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d5af71] font-display text-sm font-bold text-[#1b1820]">{profileName[0]}</span>
+              <span className="min-w-0"><span className="block truncate text-xs font-bold text-[#e6dfd3]">{profileName}</span><span className="font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#707284]">personal archive</span></span>
+            </Link>
+          </div>
+        </div>
+      </aside>
+      <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b hairline bg-[#0d0f18]/80 px-4 backdrop-blur-xl sm:px-7 md:ml-[248px] md:h-[78px] md:px-10">
+        <div className="flex items-center gap-3 md:hidden"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e47a58] text-[#17151f]"><Film size={16} /></span><span className="font-display text-xl">ducere</span></div>
+        <form onSubmit={submit} className="relative hidden max-w-[330px] flex-1 md:block" role="search">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6d6f82]" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your cinema..." className="h-10 w-full rounded-xl border border-[#292c3c] bg-[#171a27] pl-10 pr-4 text-xs text-[#e9e1d5] outline-none transition placeholder:text-[#676a7a] focus:border-[#c66f58]" data-testid="input-global-search" />
+          <kbd className="absolute right-3 top-2.5 rounded border border-[#36394a] px-1.5 py-0.5 font-mono-ui text-[9px] text-[#656878]">/</kbd>
+        </form>
+        <div className="flex items-center gap-2.5 md:ml-auto"><span className="hidden font-mono-ui text-[10px] uppercase tracking-[.18em] text-[#676a7a] sm:block">{todayLabel}</span><Link href="/profile" className="flex h-9 w-9 items-center justify-center rounded-full border border-[#404052] bg-[#d5af71] font-display text-sm font-bold text-[#1b1820]" data-testid="link-header-profile">{profileName[0]}</Link></div>
+      </header>
+      <nav className="fixed bottom-0 left-0 right-0 z-30 flex h-[72px] items-center justify-around border-t hairline bg-[#10121d]/95 px-2 backdrop-blur-xl md:hidden" aria-label="Mobile navigation">
+        {navItems.slice(0, 5).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex min-w-[54px] flex-col items-center gap-1 py-1 text-[10px] font-semibold ${location === href || (href !== '/' && location.startsWith(href)) ? 'text-[#e47a58]' : 'text-[#777989]'}`} data-testid={`link-mobile-${label.toLowerCase()}`}><Icon size={19} /><span>{label === 'Watchlist' ? 'Saved' : label}</span></Link>)}
+        <Link href="/profile" className="flex min-w-[54px] flex-col items-center gap-1 py-1 text-[10px] font-semibold text-[#777989]" data-testid="link-mobile-profile"><UserRound size={19} /><span>Profile</span></Link>
+      </nav>
+    </>
+  );
+}
+
+type DucereProps = ReturnType<typeof useDucere> & {
+  catalog: Title[];
+  catalogLoading?: boolean;
+  catalogError?: string | null;
+};
+
+const findTitle = (catalog: Title[], id: string) => catalog.find((title) => title.id === id) ?? titleById(id);
+
+function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description?: string; action?: ReactNode }) {
+  return <div className="mb-9 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="mb-3 font-mono-ui text-[10px] uppercase tracking-[.24em] text-[#df8265]">{eyebrow}</p><h1 className="font-display text-[clamp(2.4rem,5vw,4.8rem)] leading-[.94] tracking-[-.045em] text-[#f1e9dc]">{title}</h1>{description && <p className="mt-4 max-w-xl text-sm leading-6 text-[#9697a6]">{description}</p>}</div>{action}</div>;
+}
+
+function SectionHeading({ eyebrow, title, href, linkLabel = 'See all' }: { eyebrow?: string; title: string; href?: string; linkLabel?: string }) {
+  return <div className="mb-4 flex items-end justify-between"><div><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">{eyebrow}</p><h2 className="mt-1 text-lg font-bold tracking-[-.02em] text-[#e9e1d6]">{title}</h2></div>{href && <Link href={href} className="flex items-center gap-1 text-xs font-semibold text-[#bd8a78] transition hover:text-[#eda07f]" data-testid={`link-see-${title.toLowerCase().replaceAll(' ', '-')}`}>{linkLabel}<ArrowRight size={14} /></Link>}</div>;
+}
+
+function PosterCard({ title, userTitle, onStatus }: { title: Title; userTitle?: DucereProps['userTitles'][number]; onStatus?: (status: UserStatus) => void }) {
+  const [broken, setBroken] = useState(false);
+  return <div className="poster-card min-w-0" data-testid={`card-title-${title.id}`}>
+    <div className={`relative aspect-[2/3] overflow-hidden rounded-[10px] bg-gradient-to-br ${typeTint[title.type]} shadow-[0_8px_20px_rgba(0,0,0,.2)]`}>
+      {!broken && <img src={title.poster} alt={`${title.name} poster`} className="h-full w-full object-cover" onError={() => setBroken(true)} />}
+      {broken && <div className="absolute inset-0 flex flex-col justify-end p-4"><Film size={20} className="mb-auto text-white/35" /><p className="font-display text-xl leading-tight text-[#f2dfcf]">{title.name}</p><p className="mt-2 font-mono-ui text-[9px] uppercase tracking-[.16em] text-white/45">{title.releaseYear} · {title.type}</p></div>}
+      <div className="poster-overlay absolute inset-0 flex items-end bg-gradient-to-t from-[#10111a] via-transparent to-transparent p-3"><Link href={`/title/${title.id}`} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#f2dfcf]/95 py-2 text-[11px] font-bold text-[#201b22]" data-testid={`link-open-title-${title.id}`}><MoreHorizontal size={14} /> View title</Link></div>
+      {userTitle && <span className={`absolute left-2 top-2 rounded-md px-2 py-1 font-mono-ui text-[8px] uppercase tracking-[.1em] backdrop-blur ${userTitle.status === 'watching' ? 'bg-[#e47a58]/90 text-[#211923]' : userTitle.status === 'watched' ? 'bg-[#d5af71]/90 text-[#211923]' : 'bg-[#1a1c29]/85 text-[#e8ded2]'}`}>{userTitle.status === 'watching' ? 'In progress' : userTitle.status === 'watched' ? 'Watched' : 'Saved'}</span>}
+    </div>
+    <div className="mt-3 flex items-start justify-between gap-2"><Link href={`/title/${title.id}`} className="min-w-0" data-testid={`link-title-${title.id}`}><h3 className="truncate text-[13px] font-bold text-[#e9e0d4]">{title.name}</h3><p className="mt-1 font-mono-ui text-[9px] uppercase tracking-[.11em] text-[#747687]">{title.releaseYear} · {title.type}</p></Link><span className="mt-0.5 flex shrink-0 items-center gap-1 text-[10px] text-[#d6ae6f]"><Star size={10} fill="currentColor" />{title.rating}</span></div>
+    {onStatus && <button className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-[#9193a3] transition hover:text-[#e47a58]" onClick={() => onStatus(userTitle?.status === 'watchlist' ? 'watching' : 'watchlist')} data-testid={`button-toggle-status-${title.id}`}>{userTitle?.status === 'watchlist' ? <><PlayCircle size={12} /> Start watching</> : <><Bookmark size={12} /> Save for later</>}</button>}
+  </div>;
+}
+
+function HomePage({ userTitles, profile, counts, getUserTitle, setStatus, upsert, catalog }: DucereProps) {
+  const watching = userTitles.filter((item) => item.status === 'watching').map((item) => ({ item, title: findTitle(catalog, item.titleId)! })).filter((x) => x.title);
+  const saved = userTitles.filter((item) => item.status === 'watchlist').map((item) => ({ item, title: findTitle(catalog, item.titleId)! })).filter((x) => x.title);
+  const recommendations = catalog.filter((title) => !userTitles.some((item) => item.titleId === title.id)).slice(0, 5);
+  return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12">
+    <div className="fade-up relative mb-12 overflow-hidden rounded-[18px] border border-[#68453f]/40 bg-[#211e2b] px-6 py-9 sm:px-10 sm:py-11">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_25%,rgba(228,122,88,.22),transparent_28%),radial-gradient(circle_at_45%_120%,rgba(92,71,116,.26),transparent_40%)]" />
+      <div className="relative max-w-2xl"><p className="mb-5 flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[.24em] text-[#df8265]"><span className="h-1.5 w-1.5 rounded-full bg-[#e47a58] shadow-[0_0_12px_#e47a58]" /> Your private cinema</p><h1 className="font-display text-[clamp(2.7rem,6vw,5.6rem)] leading-[.91] tracking-[-.055em] text-[#f2e9d9]">Good evening,<br /><span className="text-[#e47a58]">{profile.username}.</span></h1><p className="mt-6 max-w-md text-sm leading-6 text-[#a6a1a6]">A quiet place for the stories that stay with you. Pick up where you left off or find something for tonight.</p><Link href="/discover" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#e47a58] px-4 py-3 text-xs font-bold text-[#211923] transition hover:bg-[#ee8b69]" data-testid="link-home-discover">Find something to watch <ArrowRight size={15} /></Link></div>
+      <div className="absolute -bottom-20 -right-14 hidden h-72 w-72 rounded-full border border-[#e47a58]/15 sm:block" /><div className="absolute -bottom-10 right-10 hidden h-56 w-56 rounded-full border border-[#e47a58]/20 sm:block" />
+    </div>
+    <div className="fade-up-2 mb-12 grid grid-cols-2 gap-3 sm:grid-cols-4"><StatTile label="In your library" value={counts.all} icon={<Library size={16} />} /><StatTile label="Want to watch" value={counts.watchlist} icon={<Bookmark size={16} />} /><StatTile label="In progress" value={counts.watching} icon={<CirclePlay size={16} />} /><StatTile label="Completed" value={counts.watched} icon={<CheckCircle2 size={16} />} /></div>
+    <section className="fade-up-3 mb-12"><SectionHeading eyebrow="Continue the story" title="Pick up where you left off" href="/watching" />{watching.length ? <div className="grid gap-4 lg:grid-cols-2">{watching.map(({ item, title }) => <ContinueCard key={title.id} title={title} item={item} onFinish={() => setStatus(title.id, 'watched')} onProgress={(progress) => upsert(title.id, { progress })} />)}</div> : <EmptyState icon={<CirclePlay size={24} />} title="Your next chapter is waiting" copy="Start watching a title and your progress will live here." href="/discover" action="Browse titles" />}</section>
+    <section className="mb-12"><SectionHeading eyebrow="Your queue" title="Saved for a later night" href="/watchlist" />{saved.length ? <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-4 lg:grid-cols-5">{saved.map(({ item, title }) => <PosterCard key={title.id} title={title} userTitle={item} onStatus={(status) => setStatus(title.id, status)} />)}</div> : <EmptyState icon={<Bookmark size={24} />} title="A blank canvas" copy="Save a few titles for the next time the couch calls." href="/discover" action="Explore discover" />}</section>
+    <section className="pb-10"><SectionHeading eyebrow="A considered selection" title="For your next viewing" href="/discover" /><div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">{recommendations.map((title) => <PosterCard key={title.id} title={title} />)}</div></section>
+  </div>;
+}
+
+function ContinueCard({ title, item, onFinish, onProgress }: { title: Title; item: DucereProps['userTitles'][number]; onFinish: () => void; onProgress: (progress: number) => void }) {
+  const [progress, setProgress] = useState(item.progress ?? 0);
+  return <div className="panel flex gap-4 rounded-2xl p-3 sm:p-4"><Link href={`/title/${title.id}`} className={`relative h-[142px] w-[96px] shrink-0 overflow-hidden rounded-lg bg-gradient-to-br ${typeTint[title.type]}`} data-testid={`link-continue-poster-${title.id}`}><img src={title.poster} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} /><span className="absolute bottom-2 left-2 rounded bg-[#0d0f18]/80 px-1.5 py-1 font-mono-ui text-[8px] text-[#f2dfc5]">S{item.currentSeason ?? 1} · E{item.currentEpisode ?? 1}</span></Link><div className="flex min-w-0 flex-1 flex-col justify-between py-1"><div><div className="flex items-start justify-between gap-2"><div><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#df8265]">Continue watching</p><Link href={`/title/${title.id}`} className="mt-1 block truncate text-base font-bold text-[#e9dfd2]" data-testid={`link-continue-title-${title.id}`}>{title.name}</Link></div><MoreHorizontal size={17} className="text-[#6f7180]" /></div><p className="mt-1 text-xs text-[#888a9a]">Season {item.currentSeason ?? 1}, episode {item.currentEpisode ?? 1}</p></div><div><div className="mb-2 flex items-center justify-between font-mono-ui text-[9px] text-[#797b8a]"><span>{progress}% complete</span><span>Next up</span></div><input type="range" min="0" max="100" value={progress} onChange={(e) => { const value = Number(e.target.value); setProgress(value); onProgress(value); }} className="h-1.5 w-full accent-[#e47a58]" aria-label={`Progress for ${title.name}`} data-testid={`input-progress-${title.id}`} /><div className="mt-3 flex items-center gap-3"><Link href={`/title/${title.id}`} className="text-[10px] font-bold text-[#e47a58]" data-testid={`link-resume-${title.id}`}>Resume</Link><button onClick={onFinish} className="text-[10px] font-semibold text-[#848696] hover:text-[#e5d7c9]" data-testid={`button-finish-${title.id}`}>Mark watched</button></div></div></div></div>;
+}
+
+function StatTile({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
+  return <div className="panel-soft rounded-xl px-4 py-4"><div className="mb-4 flex items-center justify-between text-[#df8265]">{icon}<span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#6f7181]">2024</span></div><p className="text-2xl font-bold tracking-[-.04em] text-[#eee4d5]">{value}</p><p className="mt-1 text-[11px] text-[#898b99]">{label}</p></div>;
+}
+
+function EmptyState({ icon, title, copy, href, action }: { icon: ReactNode; title: string; copy: string; href: string; action: string }) {
+  return <div className="panel-soft flex flex-col items-center justify-center rounded-2xl px-6 py-12 text-center"><div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#e47a58]/20 bg-[#e47a58]/10 text-[#e47a58]">{icon}</div><h3 className="font-display text-2xl text-[#e7ddce]">{title}</h3><p className="mt-2 max-w-sm text-xs leading-5 text-[#858797]">{copy}</p><Link href={href} className="mt-5 inline-flex items-center gap-2 rounded-lg border border-[#6a3f37] px-3.5 py-2 text-[11px] font-bold text-[#e78b6c] transition hover:bg-[#e47a58]/10" data-testid={`link-empty-${action.toLowerCase().replaceAll(' ', '-')}`}>{action}<ArrowRight size={13} /></Link></div>;
+}
+
+function DiscoverPage({ userTitles, setStatus }: DucereProps) {
+  const query = new URLSearchParams(window.location.search).get('q') ?? '';
+  const [search, setSearch] = useState(query);
+  const [type, setType] = useState<'all' | TitleType>('all');
+  const results = useMemo(() => TITLES.filter((title) => (type === 'all' || title.type === type) && `${title.name} ${title.genres.join(' ')}`.toLowerCase().includes(search.toLowerCase())), [search, type]);
+  return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12"><PageIntro eyebrow="Discover" title="Find your next film." description="A handpicked shelf of movies, series, and anime. Search by title or mood." /><div className="mb-10 flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777989]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Try “quiet sci-fi” or “Breaking Bad”" className="h-12 w-full rounded-xl border border-[#303345] bg-[#171a27] pl-11 pr-4 text-sm outline-none placeholder:text-[#686a7a] focus:border-[#d17459]" data-testid="input-discover-search" /></div><div className="flex gap-2">{(['all', 'movie', 'tv', 'anime'] as const).map((filter) => <button key={filter} onClick={() => setType(filter)} className={`rounded-xl px-4 py-2 text-[11px] font-bold capitalize transition ${type === filter ? 'bg-[#e47a58] text-[#211923]' : 'border border-[#303345] text-[#9495a3] hover:border-[#765045]'}`} data-testid={`button-filter-${filter}`}>{filter === 'all' ? 'Everything' : filter === 'tv' ? 'Series' : filter}</button>)}</div></div><div className="mb-5 flex items-center justify-between"><p className="text-xs text-[#777989]"><span className="font-bold text-[#e2d8c8]">{results.length}</span> titles in the archive</p><button className="flex items-center gap-2 text-[11px] font-semibold text-[#8d8f9f]" data-testid="button-discover-sort"><SlidersHorizontal size={14} /> Curated order</button></div>{results.length ? <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{results.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}</div>;
+}
+
+function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalogError }: DucereProps) {
+  const query = new URLSearchParams(window.location.search).get('q') ?? '';
+  const [search, setSearch] = useState(query);
+  const [type, setType] = useState<'all' | TitleType>('all');
+  const [visibleCount, setVisibleCount] = useState(96);
+  useEffect(() => setVisibleCount(96), [search, type]);
+  const results = useMemo(
+    () => catalog.filter((title) => (type === 'all' || title.type === type) && `${title.name} ${title.genres.join(' ')} ${title.description}`.toLowerCase().includes(search.toLowerCase())),
+    [catalog, search, type],
+  );
+  const visible = results.slice(0, visibleCount);
+  return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12">
+    <PageIntro eyebrow="Discover" title="Find your next film." description="A curated shelf backed by a growing live index of series and anime. Search by title, genre, or mood." />
+    <div className="mb-10 flex flex-col gap-3 sm:flex-row">
+      <div className="relative flex-1"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777989]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Try “quiet sci-fi” or “Breaking Bad”" className="h-12 w-full rounded-xl border border-[#303345] bg-[#171a27] pl-11 pr-4 text-sm outline-none placeholder:text-[#686a7a] focus:border-[#d17459]" data-testid="input-discover-search" /></div>
+      <div className="flex gap-2 overflow-x-auto">{(['all', 'movie', 'tv', 'anime'] as const).map((filter) => <button key={filter} onClick={() => setType(filter)} className={`rounded-xl px-4 py-2 text-[11px] font-bold capitalize transition ${type === filter ? 'bg-[#e47a58] text-[#211923]' : 'border border-[#303345] text-[#9495a3] hover:border-[#765045]'}`} data-testid={`button-filter-${filter}`}>{filter === 'all' ? 'Everything' : filter === 'tv' ? 'Series' : filter}</button>)}</div>
+    </div>
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-[#777989]"><span className="font-bold text-[#e2d8c8]">{results.length}</span> titles indexed{catalogLoading ? ' · loading more from live sources' : ''}</p><span className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#666879]">Curated + live catalog</span></div>
+    {catalogError && <div className="mb-5 rounded-xl border border-[#6a493f] bg-[#31252a] px-4 py-3 text-xs text-[#c6aaa1]">{catalogError}</div>}
+    {visible.length ? <><div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{visible.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div>{visible.length < results.length && <div className="flex justify-center py-12"><button onClick={() => setVisibleCount((current) => current + 96)} className="rounded-xl border border-[#6a4038] px-5 py-3 text-xs font-bold text-[#e78b6c] transition hover:bg-[#e47a58]/10" data-testid="button-load-more">Load more titles <span className="ml-1 text-[#9c7f77]">({results.length - visible.length} remaining)</span></button></div>}</> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}
+  </div>;
+}
+
+function FilterBar({ search, setSearch, status, setStatus, type, setType }: { search: string; setSearch: (value: string) => void; status: string; setStatus: (value: string) => void; type: string; setType: (value: string) => void }) {
+  return <div className="mb-8 flex flex-col gap-3 lg:flex-row"><div className="relative flex-1"><Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#747687]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your library..." className="h-10 w-full rounded-lg border border-[#303345] bg-[#171a27] pl-10 pr-4 text-xs outline-none placeholder:text-[#6d6f7e] focus:border-[#d17459]" data-testid="input-library-search" /></div><div className="flex gap-2 overflow-x-auto scrollbar-hide"><select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 rounded-lg border border-[#303345] bg-[#171a27] px-3 text-xs text-[#aaa8ad] outline-none" data-testid="select-library-status"><option value="all">All status</option><option value="watchlist">Want to watch</option><option value="watching">Watching</option><option value="watched">Watched</option></select><select value={type} onChange={(e) => setType(e.target.value)} className="h-10 rounded-lg border border-[#303345] bg-[#171a27] px-3 text-xs text-[#aaa8ad] outline-none" data-testid="select-library-type"><option value="all">All types</option><option value="movie">Movies</option><option value="tv">Series</option><option value="anime">Anime</option></select><button className="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[#303345] px-3 text-xs text-[#aaa8ad]" data-testid="button-library-sort"><ChevronDown size={14} /> Recently added</button></div></div>;
+}
+
+function LibraryPage({ userTitles, setStatus, catalog }: DucereProps) {
+  const [search, setSearch] = useState(''); const [status, setStatusFilter] = useState('all'); const [type, setType] = useState('all');
+  const visible = userTitles.map((item) => ({ item, title: findTitle(catalog, item.titleId)! })).filter(({ item, title }) => title && (status === 'all' || item.status === status) && (type === 'all' || title.type === type) && title.name.toLowerCase().includes(search.toLowerCase()));
+  return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12"><PageIntro eyebrow="Library" title="Your collection." description="Every story has a place here. Filter the archive down to exactly what you want to see." /><FilterBar search={search} setSearch={setSearch} status={status} setStatus={setStatusFilter} type={type} setType={setType} />{visible.length ? <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{visible.map(({ item, title }) => <PosterCard key={title.id} title={title} userTitle={item} onStatus={(next) => setStatus(title.id, next)} />)}</div> : <EmptyState icon={<Library size={23} />} title="This shelf is quiet" copy="Adjust your filters or discover something worth keeping." href="/discover" action="Go to discover" />}</div>;
+}
+
+function CollectionPage({ userTitles, status, setStatus, catalog }: DucereProps & { status: 'watchlist' | 'watching' }) {
+  const entries = userTitles.filter((item) => item.status === status).map((item) => ({ item, title: findTitle(catalog, item.titleId)! })).filter((x) => x.title);
+  const isWatching = status === 'watching';
+  return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12"><PageIntro eyebrow={isWatching ? 'In progress' : 'Watchlist'} title={isWatching ? 'Keep going.' : 'For a later night.'} description={isWatching ? 'Your current stories, with the next step always close at hand.' : 'The titles that caught your eye. No pressure, just a good queue for when the mood arrives.'} />{entries.length ? isWatching ? <div className="grid gap-4 lg:grid-cols-2">{entries.map(({ item, title }) => <ContinueCard key={title.id} item={item} title={title} onFinish={() => setStatus(title.id, 'watched')} />)}</div> : <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{entries.map(({ item, title }) => <PosterCard key={title.id} title={title} userTitle={item} onStatus={(next) => setStatus(title.id, next)} />)}</div> : <EmptyState icon={isWatching ? <PlayCircle size={23} /> : <Bookmark size={23} />} title={isWatching ? 'Nothing mid-story' : 'Your queue is open'} copy={isWatching ? 'Move a title from your watchlist when you are ready to begin.' : 'Save films, shows, and anime from discover to keep them close.'} href={isWatching ? '/watchlist' : '/discover'} action={isWatching ? 'View watchlist' : 'Browse discover'} />}</div>;
+}
+
+function HistoryPage({ userTitles, catalog }: DucereProps) {
+  const watched = userTitles.filter((item) => item.status === 'watched').map((item) => ({ item, title: findTitle(catalog, item.titleId)! })).filter((x) => x.title);
+  return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12"><PageIntro eyebrow="Your record" title="The films that stayed." description="A private record of the stories you have finished, and what you thought of them." action={<button className="flex items-center gap-2 rounded-lg border border-[#353646] px-3 py-2 text-[11px] font-semibold text-[#aaa8aa]" data-testid="button-history-filter"><SlidersHorizontal size={14} /> Filter by year</button>} />{watched.length ? <div className="space-y-2">{watched.map(({ item, title }) => <HistoryRow key={title.id} title={title} item={item} />)}</div> : <EmptyState icon={<History size={23} />} title="The record starts here" copy="Mark a title as watched and leave a note for your future self." href="/discover" action="Find a title" />}</div>;
+}
+
+function HistoryRow({ title, item }: { title: Title; item: DucereProps['userTitles'][number] }) {
+  return <div className="panel-soft group flex items-center gap-4 rounded-xl p-3 transition hover:bg-[#2a2c3d] sm:p-4"><Link href={`/title/${title.id}`} className={`h-20 w-14 shrink-0 overflow-hidden rounded-md bg-gradient-to-br ${typeTint[title.type]}`} data-testid={`link-history-poster-${title.id}`}><img src={title.poster} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} /></Link><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><Link href={`/title/${title.id}`} className="truncate text-sm font-bold text-[#e8ded2]" data-testid={`link-history-title-${title.id}`}>{title.name}</Link><span className="rounded bg-[#333144] px-1.5 py-0.5 font-mono-ui text-[8px] uppercase text-[#9a96a7]">{title.type}</span></div><p className="mt-1 text-xs text-[#838594]">{item.dateWatched ? `Watched ${new Date(item.dateWatched).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Recently completed'}{item.review ? ` · “${item.review}”` : ''}</p></div><div className="hidden items-center gap-1 sm:flex">{Array.from({ length: 5 }).map((_, index) => <Star key={index} size={13} className={index < (item.rating ?? 0) ? 'text-[#d5af71]' : 'text-[#4e5061]'} fill={index < (item.rating ?? 0) ? 'currentColor' : 'none'} />)}</div><ChevronRight size={16} className="text-[#626475]" /></div>;
+}
+
+function TitleDetailsPage(props: DucereProps) {
+  const { id } = useParams<{ id: string }>(); const title = findTitle(props.catalog, id ?? '');
+  if (!title) return <NotFound />;
+  return <TitleDetails title={title} {...props} />;
+}
+
+function TitleDetails({ title, getUserTitle, upsert, setStatus, remove, profile }: { title: Title } & DucereProps) {
+  const existing = getUserTitle(title.id);
+  const [liveProviders, setLiveProviders] = useState<Title['providers'] | null>(null);
+  const [providerLoading, setProviderLoading] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setProviderLoading(true);
+    fetchWatchProvidersByTitle(title.name, title.type, profile.country).then((providers) => {
+      if (!cancelled && providers.length) setLiveProviders(providers);
+    }).finally(() => { if (!cancelled) setProviderLoading(false); });
+    return () => { cancelled = true; };
+  }, [title.id, title.name, title.type, profile.country]);
+  const [review, setReview] = useState(existing?.review ?? '');
+  const [rating, setRating] = useState(existing?.rating ?? 0);
+  const [progress, setProgress] = useState(existing?.progress ?? 0);
+  const status = existing?.status as string | undefined;
+  const isWatchlist = status === ('watchlist' as UserStatus);
+  const setAndKeep = (next: UserStatus) => setStatus(title.id, next);
+  return <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-12"><Link href="/discover" className="mb-7 inline-flex items-center gap-2 text-xs font-semibold text-[#898b9b] hover:text-[#e47a58]" data-testid="link-back-discover"><ArrowRight size={14} className="rotate-180" /> Back to discover</Link><section className="relative overflow-hidden rounded-[18px] border border-[#3e3440] bg-[#1a1b29]"><div className="absolute inset-0 bg-cover bg-center opacity-20" style={{ backgroundImage: `url(${title.backdrop})` }} /><div className="absolute inset-0 bg-gradient-to-r from-[#171824] via-[#171824]/95 to-[#171824]/45" /><div className="relative grid gap-8 px-6 py-8 sm:px-10 sm:py-12 lg:grid-cols-[220px_1fr] lg:gap-12"><div className={`mx-auto aspect-[2/3] w-[180px] overflow-hidden rounded-xl bg-gradient-to-br ${typeTint[title.type]} shadow-2xl lg:mx-0 lg:w-full`}><img src={title.poster} alt={`${title.name} poster`} className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} /></div><div className="max-w-3xl self-end"><div className="mb-4 flex flex-wrap items-center gap-2"><span className="rounded-md bg-[#e47a58] px-2 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#211923]">{title.type}</span><span className="font-mono-ui text-[10px] text-[#a0a0aa]">{title.releaseYear} · {title.runtime}</span><span className="flex items-center gap-1 font-mono-ui text-[10px] text-[#d5af71]"><Star size={11} fill="currentColor" /> {title.rating} / 10</span></div><h1 className="font-display text-[clamp(2.7rem,7vw,6.7rem)] leading-[.9] tracking-[-.055em] text-[#f1e8d8]">{title.name}</h1><p className="mt-6 max-w-2xl text-sm leading-7 text-[#b4b0b1]">{title.description}</p><div className="mt-7 flex flex-wrap gap-2">{title.genres.map((genre) => <span key={genre} className="rounded-full border border-[#505064] px-3 py-1.5 text-[10px] text-[#a9a5a8]">{genre}</span>)}</div></div></div></section><div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_.7fr]"><div className="space-y-6"><div className="panel rounded-2xl p-5 sm:p-7"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="font-mono-ui text-[9px] uppercase tracking-[.18em] text-[#df8265]">Your place in the story</p><h2 className="mt-1 text-lg font-bold text-[#eae1d6]">{status ? formatStatus(status) : 'Not in your library'}</h2></div><div className="flex flex-wrap gap-2">{status !== 'watchlist' && <button onClick={() => setAndKeep('watchlist')} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-bold ${status === 'watchlist' ? 'border-[#e47a58] text-[#e47a58]' : 'border-[#454657] text-[#b1adb0] hover:border-[#d17459]'}`} data-testid="button-add-watchlist"><Bookmark size={14} /> Save for later</button>}{status !== 'watching' && status !== 'watched' && <button onClick={() => setAndKeep('watching')} className="flex items-center gap-2 rounded-lg bg-[#e47a58] px-3 py-2 text-[11px] font-bold text-[#211923]" data-testid="button-start-watching"><PlayCircle size={14} /> Start watching</button>}{status === 'watching' && <button onClick={() => setAndKeep('watched')} className="flex items-center gap-2 rounded-lg bg-[#d5af71] px-3 py-2 text-[11px] font-bold text-[#211923]" data-testid="button-mark-watched"><Check size={14} /> Mark watched</button>}{status && <button onClick={() => remove(title.id)} className="rounded-lg border border-[#454657] p-2 text-[#898b9b] hover:border-[#c55f57] hover:text-[#df7565]" aria-label="Remove from library" data-testid="button-remove-title"><Trash2 size={14} /></button>}</div></div>{status === 'watching' && <div className="mt-7 border-t hairline pt-6"><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold text-[#c4bdba]">Viewing progress</span><span className="font-mono-ui text-[11px] text-[#e47a58]">{progress}%</span></div><input type="range" min="0" max="100" value={progress} onChange={(e) => { const next = Number(e.target.value); setProgress(next); upsert(title.id, { progress: next }); }} className="h-2 w-full accent-[#e47a58]" data-testid="input-title-progress" />{title.type !== 'movie' && <p className="mt-3 text-[11px] text-[#818393]">Season {existing?.currentSeason ?? 1}, episode {existing?.currentEpisode ?? 1} · Drag to keep the whole journey in view.</p>}</div>}{status === 'watched' && <div className="mt-7 border-t hairline pt-6"><div className="mb-3 flex items-center justify-between"><span className="text-xs font-semibold text-[#c4bdba]">Your rating</span><span className="font-mono-ui text-[10px] text-[#777989]">{rating ? `${rating} / 5` : 'Not rated yet'}</span></div><div className="flex gap-2">{[1, 2, 3, 4, 5].map((value) => <button key={value} onClick={() => { setRating(value); upsert(title.id, { rating: value }); }} className="transition hover:scale-110" data-testid={`button-rate-${value}`} aria-label={`Rate ${value} out of 5`}><Star size={23} className={value <= rating ? 'text-[#d5af71]' : 'text-[#4b4c5b]'} fill={value <= rating ? 'currentColor' : 'none'} /></button>)}</div><textarea value={review} onChange={(e) => { setReview(e.target.value); upsert(title.id, { review: e.target.value }); }} placeholder="Leave a note for future you..." className="mt-5 min-h-[100px] w-full resize-y rounded-xl border border-[#353747] bg-[#171925] p-3 text-xs leading-5 text-[#dcd3c7] outline-none placeholder:text-[#676978] focus:border-[#d17459]" data-testid="textarea-title-review" /></div>}</div><div className="panel-soft rounded-2xl p-5 sm:p-7"><SectionHeading eyebrow="The details" title="Credits & context" /><div className="grid gap-5 text-xs sm:grid-cols-2"><div><p className="mb-1 text-[#6f7181]">{title.type === 'movie' ? 'Directed by' : 'Created by'}</p><p className="font-semibold text-[#d6cdc1]">{title.director}</p></div><div><p className="mb-1 text-[#6f7181]">Cast</p><p className="font-semibold leading-5 text-[#d6cdc1]">{title.cast.join(' · ')}</p></div><div><p className="mb-1 text-[#6f7181]">Format</p><p className="font-semibold text-[#d6cdc1]">{title.type === 'movie' ? title.runtime : `${title.seasons} seasons · ${title.episodes} episodes`}</p></div><div><p className="mb-1 text-[#6f7181]">Genres</p><p className="font-semibold text-[#d6cdc1]">{title.genres.join(' · ')}</p></div></div></div></div><div className="panel h-fit rounded-2xl p-5 sm:p-7"><SectionHeading eyebrow="Availability" title="Where to watch" /><p className="mb-5 text-xs leading-5 text-[#848696]">Availability follows the region selected in Settings. Live provider data is shown when TMDB can verify a match; otherwise Ducere keeps its curated fallback. Prices and catalogs can change.</p><div className="space-y-2">{(liveProviders ?? title.providers).map((provider) => <div key={`${provider.name}-${provider.kind}`} className="flex items-center justify-between rounded-xl border border-[#303244] bg-[#181a28] px-3 py-3"><div className="flex items-center gap-3"><span className={`flex h-8 w-8 items-center justify-center rounded-lg ${provider.kind === 'streaming' ? 'bg-[#d17459]/15 text-[#e47a58]' : provider.kind === 'free' ? 'bg-[#6ca58a]/15 text-[#81c09d]' : 'bg-[#d5af71]/15 text-[#d5af71]'}`}><PlayCircle size={15} /></span><div><p className="text-xs font-bold text-[#dcd3c6]">{provider.name}</p><p className="mt-0.5 text-[10px] capitalize text-[#767889]">{provider.kind}</p></div></div>{provider.url ? <a href={provider.url} target="_blank" rel="noreferrer" className="rounded-md border border-[#414355] px-2.5 py-1.5 text-[10px] font-semibold text-[#9a9baa] transition hover:border-[#d17459] hover:text-[#e47a58]" data-testid={`button-provider-${provider.name.toLowerCase().replaceAll(' ', '-')}`}>{provider.kind === 'streaming' || provider.kind === 'free' ? 'Open' : 'View'}</a> : <a href={`https://www.google.com/search?q=${encodeURIComponent(title.name+' '+provider.name+' watch')}`} target="_blank" rel="noreferrer" className="rounded-md border border-[#414355] px-2.5 py-1.5 text-[10px] font-semibold text-[#9a9baa] transition hover:border-[#d17459] hover:text-[#e47a58]">Search</a>}</div>)}</div>{providerLoading && <p className="mt-3 text-[10px] text-[#777989]">Checking live regional availability…</p>}<div className="mt-6 rounded-xl border border-[#4f3f3d] bg-[#332528]/40 p-3 text-[10px] leading-5 text-[#a69a96]"><MapPin size={13} className="mb-1 text-[#df8265]" />Your region is set in Settings. Ducere uses regional availability data when available and never treats a missing provider as confirmed.</div></div></div></div>;
+}
+
+function ProfilePage({ profile, userTitles, counts }: DucereProps) {
+  const rated = userTitles.filter((item) => item.rating); const avg = rated.length ? (rated.reduce((sum, item) => sum + (item.rating ?? 0), 0) / rated.length).toFixed(1) : '—';
+  return <div className="mx-auto max-w-[1200px] px-5 py-9 sm:px-8 lg:px-12"><PageIntro eyebrow="Your archive" title={`${profile.username}'s cinema.`} description="A small portrait of what you make time for." action={<Link href="/settings" className="flex items-center gap-2 rounded-lg border border-[#353646] px-3 py-2 text-[11px] font-semibold text-[#aaa8aa]" data-testid="link-profile-settings"><Settings size={14} /> Edit profile</Link>} /><div className="grid gap-4 sm:grid-cols-3"><div className="panel rounded-2xl p-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.17em] text-[#df8265]">In the archive</p><p className="mt-4 text-4xl font-bold text-[#f0e5d6]">{counts.all}</p><p className="mt-1 text-xs text-[#878998]">titles collected</p></div><div className="panel rounded-2xl p-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.17em] text-[#df8265]">Finished</p><p className="mt-4 text-4xl font-bold text-[#f0e5d6]">{counts.watched}</p><p className="mt-1 text-xs text-[#878998]">stories completed</p></div><div className="panel rounded-2xl p-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.17em] text-[#df8265]">Your average</p><p className="mt-4 flex items-center gap-2 text-4xl font-bold text-[#f0e5d6]">{avg}<Star size={23} className="text-[#d5af71]" fill="currentColor" /></p><p className="mt-1 text-xs text-[#878998]">out of five</p></div></div><div className="mt-6 grid gap-6 lg:grid-cols-[1fr_.8fr]"><div className="panel rounded-2xl p-6"><SectionHeading eyebrow="Your activity" title="Recent movements" /><div className="space-y-5">{userTitles.slice().reverse().map((item, index) => { const title = titleById(item.titleId); if (!title) return null; return <div key={item.titleId} className="flex items-center gap-3"><div className={`flex h-8 w-8 items-center justify-center rounded-lg ${index % 2 ? 'bg-[#d5af71]/10 text-[#d5af71]' : 'bg-[#e47a58]/10 text-[#e47a58]'}`}>{item.status === 'watched' ? <Check size={15} /> : item.status === 'watching' ? <PlayCircle size={15} /> : <Bookmark size={15} />}</div><p className="text-xs text-[#aaa6a4]"><span className="font-bold text-[#dfd6ca]">{formatStatus(item.status)}</span> <Link href={`/title/${title.id}`} className="text-[#df8265] hover:underline">{title.name}</Link><span className="block mt-1 font-mono-ui text-[9px] text-[#6f7180]">{item.dateWatched ?? item.dateAdded}</span></p></div>; })}</div></div><div className="panel rounded-2xl p-6"><SectionHeading eyebrow="Viewing fingerprint" title="Your favorite worlds" /><div className="mt-5 space-y-4">{['Drama', 'Action', 'Animation', 'Sci-Fi'].map((genre, index) => <div key={genre}><div className="mb-2 flex justify-between text-[11px]"><span className="text-[#b8b1ad]">{genre}</span><span className="font-mono-ui text-[#777989]">{[72, 58, 46, 31][index]}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#292b3a]"><div className="h-full rounded-full bg-[#e47a58]" style={{ width: `${[72, 58, 46, 31][index]}%` }} /></div></div>)}</div></div></div></div>;
+}
+
+function SettingsPage({ profile, updateProfile, resetData }: DucereProps) {
+  const [saved, setSaved] = useState(false);
+  const save = () => { setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
+  return <div className="mx-auto max-w-[900px] px-5 py-9 sm:px-8 lg:px-12"><PageIntro eyebrow="Preferences" title="Make it yours." description="The small choices that make Ducere feel like your room, your shelf, your night." /><div className="space-y-4"><div className="panel rounded-2xl p-5 sm:p-7"><div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Profile</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your details</h2></div><label className="mb-5 block"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Name</span><input value={profile.username} onChange={(e) => updateProfile({ username: e.target.value })} className="h-11 w-full max-w-md rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="input-profile-name" /></label><label className="block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Country or region</span><select value={profile.country} onChange={(e) => updateProfile({ country: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="select-profile-country"><option>United States</option><option>Canada</option><option>United Kingdom</option><option>Japan</option><option>Australia</option></select><span className="mt-2 block text-[10px] leading-5 text-[#747687]">We use this to show the right provider availability on title pages.</span></label></div><div className="panel rounded-2xl p-5 sm:p-7"><div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Appearance</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your viewing room</h2></div><div className="flex flex-col gap-3 sm:flex-row"><button onClick={() => updateProfile({ appearance: 'night' })} className={`flex flex-1 items-center gap-3 rounded-xl border p-4 text-left ${profile.appearance === 'night' ? 'border-[#e47a58] bg-[#e47a58]/10' : 'border-[#353747] bg-[#171925]'}`} data-testid="button-appearance-night"><Moon size={18} className="text-[#e47a58]" /><span><span className="block text-xs font-bold text-[#e3d8ca]">Night screening</span><span className="mt-1 block text-[10px] text-[#787a8a]">The Ducere default</span></span>{profile.appearance === 'night' && <Check size={15} className="ml-auto text-[#e47a58]" />}</button><button onClick={() => updateProfile({ appearance: 'day' })} className={`flex flex-1 items-center gap-3 rounded-xl border p-4 text-left ${profile.appearance === 'day' ? 'border-[#e47a58] bg-[#e47a58]/10' : 'border-[#353747] bg-[#171925]'}`} data-testid="button-appearance-day"><Sparkles size={18} className="text-[#d5af71]" /><span><span className="block text-xs font-bold text-[#e3d8ca]">Soft daylight</span><span className="mt-1 block text-[10px] text-[#787a8a]">Coming soon</span></span>{profile.appearance === 'day' && <Check size={15} className="ml-auto text-[#e47a58]" />}</button></div></div><div className="panel rounded-2xl p-5 sm:p-7"><div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Data</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your archive, your rules</h2></div><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p className="text-xs font-semibold text-[#c1b9b5]">Reset local archive</p><p className="mt-1 text-[10px] text-[#747687]">This removes your library and restores Ducere’s sample titles.</p></div><button onClick={() => { if (window.confirm('Reset your local archive?')) resetData(); }} className="flex items-center gap-2 self-start rounded-lg border border-[#633e42] px-3 py-2 text-[11px] font-semibold text-[#df8178] hover:bg-[#633e42]/20" data-testid="button-reset-data"><RotateCcw size={14} /> Reset data</button></div></div><div className="flex items-center justify-end gap-3 pb-8"><span className={`text-xs text-[#87bd9d] transition-opacity ${saved ? 'opacity-100' : 'opacity-0'}`}>Preferences saved</span><button onClick={save} className="flex items-center gap-2 rounded-lg bg-[#e47a58] px-4 py-2.5 text-xs font-bold text-[#211923]" data-testid="button-save-settings"><Check size={14} /> Save preferences</button></div></div></div>;
+}
+
+function SettingsPageV2({ profile, updateProfile, resetData }: DucereProps) {
+  const [notifications, setNotifications] = useState(true);
+  const [privateArchive, setPrivateArchive] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const save = () => { setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
+  return <div className="mx-auto max-w-[900px] px-5 py-9 sm:px-8 lg:px-12">
+    <PageIntro eyebrow="Preferences" title="Make it yours." description="The small choices that make Ducere feel like your room, your shelf, your night." />
+    <div className="space-y-4">
+      <div className="panel rounded-2xl p-5 sm:p-7">
+        <div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Profile</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your details</h2></div>
+        <label className="mb-5 block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Name</span><input value={profile.username} onChange={(e) => updateProfile({ username: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="input-profile-name" /></label>
+        <label className="block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Country or region</span><select value={profile.country} onChange={(e) => updateProfile({ country: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="select-profile-country"><option>United States</option><option>Canada</option><option>United Kingdom</option><option>Japan</option><option>Australia</option></select><span className="mt-2 block text-[10px] leading-5 text-[#747687]">This keeps availability useful on every title page.</span></label>
+      </div>
+      <div className="panel rounded-2xl p-5 sm:p-7">
+        <div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Appearance</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your viewing room</h2></div>
+        <div className="flex flex-col gap-3 sm:flex-row"><button onClick={() => updateProfile({ appearance: 'night' })} className={`flex flex-1 items-center gap-3 rounded-xl border p-4 text-left ${profile.appearance === 'night' ? 'border-[#e47a58] bg-[#e47a58]/10' : 'border-[#353747] bg-[#171925]'}`} data-testid="button-appearance-night"><Moon size={18} className="text-[#e47a58]" /><span><span className="block text-xs font-bold text-[#e3d8ca]">Night screening</span><span className="mt-1 block text-[10px] text-[#787a8a]">Low light, warm accents, no glare</span></span>{profile.appearance === 'night' && <Check size={15} className="ml-auto text-[#e47a58]" />}</button><button onClick={() => updateProfile({ appearance: 'day' })} className={`flex flex-1 items-center gap-3 rounded-xl border p-4 text-left ${profile.appearance === 'day' ? 'border-[#e47a58] bg-[#e47a58]/10' : 'border-[#353747] bg-[#171925]'}`} data-testid="button-appearance-day"><Sparkles size={18} className="text-[#d5af71]" /><span><span className="block text-xs font-bold text-[#e3d8ca]">Soft daylight</span><span className="mt-1 block text-[10px] text-[#787a8a]">A lighter treatment for daytime</span></span>{profile.appearance === 'day' && <Check size={15} className="ml-auto text-[#e47a58]" />}</button></div>
+      </div>
+      <div className="panel rounded-2xl p-5 sm:p-7">
+        <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Notifications & privacy</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Keep the quiet</h2></div>
+        <div className="divide-y divide-[#303244]"><SettingSwitch label="Weekly viewing note" copy="A gentle reminder of what is still waiting in your queue." value={notifications} onChange={setNotifications} testId="switch-notifications" /><SettingSwitch label="Private archive" copy="Your library stays in this browser and is never shared." value={privateArchive} onChange={setPrivateArchive} testId="switch-private-archive" /></div>
+      </div>
+      <div className="panel rounded-2xl p-5 sm:p-7">
+        <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Data</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your archive, your rules</h2></div>
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p className="text-xs font-semibold text-[#c1b9b5]">Reset local archive</p><p className="mt-1 text-[10px] text-[#747687]">Restore the sample shelf and remove your changes from this browser.</p></div><button onClick={() => { if (window.confirm('Reset your local archive?')) resetData(); }} className="flex items-center gap-2 self-start rounded-lg border border-[#633e42] px-3 py-2 text-[11px] font-semibold text-[#df8178] hover:bg-[#633e42]/20" data-testid="button-reset-data"><RotateCcw size={14} /> Reset data</button></div>
+      </div>
+      <div className="flex items-center justify-end gap-3 pb-8"><span className={`text-xs text-[#87bd9d] transition-opacity ${saved ? 'opacity-100' : 'opacity-0'}`}>Preferences saved</span><button onClick={save} className="flex items-center gap-2 rounded-lg bg-[#e47a58] px-4 py-2.5 text-xs font-bold text-[#211923]" data-testid="button-save-settings"><Check size={14} /> Save preferences</button></div>
+    </div>
+  </div>;
+}
+
+function SettingsPageV3({ profile, updateProfile, resetData }: DucereProps) {
+  const countries = [['US','United States'],['IN','India'],['CA','Canada'],['GB','United Kingdom'],['AU','Australia'],['NZ','New Zealand'],['JP','Japan'],['KR','South Korea'],['SG','Singapore'],['AE','United Arab Emirates'],['DE','Germany'],['FR','France'],['ES','Spain'],['IT','Italy'],['NL','Netherlands'],['SE','Sweden'],['BR','Brazil'],['MX','Mexico']] as const;
+  return <div className="mx-auto max-w-[900px] px-5 py-9 sm:px-8 lg:px-12">
+    <PageIntro eyebrow="Preferences" title="Make it yours." description="Choose your viewing room and the market used for availability." />
+    <div className="space-y-4">
+      <div className="panel rounded-2xl p-5 sm:p-7">
+        <div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Profile</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your details</h2></div>
+        <label className="mb-5 block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Name</span><input value={profile.username} onChange={(e) => updateProfile({ username: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="input-profile-name" /></label>
+        <label className="block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Country or region</span><select value={profile.country} onChange={(e) => updateProfile({ country: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="select-profile-country">{countries.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select><span className="mt-2 block text-[10px] leading-5 text-[#747687]">Availability uses this market for regional provider data when live provider data is connected; curated titles never claim an unverified provider.</span></label>
+      </div>
+      <div className="panel rounded-2xl p-5 sm:p-7">
+        <div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Appearance</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your viewing room</h2></div>
+        <div className="flex flex-col gap-3 sm:flex-row"><button onClick={() => updateProfile({ appearance: 'night' })} className={`flex flex-1 items-center gap-3 rounded-xl border p-4 text-left ${profile.appearance === 'night' ? 'border-[#e47a58] bg-[#e47a58]/10' : 'border-[#353747] bg-[#171925]'}`} data-testid="button-appearance-night"><Moon size={18} className="text-[#e47a58]" /><span><span className="block text-xs font-bold text-[#e3d8ca]">Night screening</span><span className="mt-1 block text-[10px] text-[#787a8a]">Low light, warm accents, no glare</span></span>{profile.appearance === 'night' && <Check size={15} className="ml-auto text-[#e47a58]" />}</button><button onClick={() => updateProfile({ appearance: 'day' })} className={`flex flex-1 items-center gap-3 rounded-xl border p-4 text-left ${profile.appearance === 'day' ? 'border-[#e47a58] bg-[#e47a58]/10' : 'border-[#353747] bg-[#171925]'}`} data-testid="button-appearance-day"><Sparkles size={18} className="text-[#d5af71]" /><span><span className="block text-xs font-bold text-[#e3d8ca]">Soft daylight</span><span className="mt-1 block text-[10px] text-[#787a8a]">A lighter treatment for daytime</span></span>{profile.appearance === 'day' && <Check size={15} className="ml-auto text-[#e47a58]" />}</button></div>
+      </div>
+      <div className="panel rounded-2xl p-5 sm:p-7">
+        <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Data</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your archive, your rules</h2></div>
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p className="text-xs font-semibold text-[#c1b9b5]">Reset local archive</p><p className="mt-1 text-[10px] text-[#747687]">Restore the full sample shelf and remove your changes from this browser.</p></div><button onClick={() => { if (window.confirm('Reset your local archive?')) resetData(); }} className="flex items-center gap-2 self-start rounded-lg border border-[#633e42] px-3 py-2 text-[11px] font-semibold text-[#df8178] hover:bg-[#633e42]/20" data-testid="button-reset-data"><RotateCcw size={14} /> Reset data</button></div>
+      </div>
+    </div>
+  </div>;
+}
+
+function SettingSwitch({ label, copy, value, onChange, testId }: { label: string; copy: string; value: boolean; onChange: (value: boolean) => void; testId: string }) {
+  return <div className="flex items-center justify-between gap-4 py-4"><div><p className="text-xs font-semibold text-[#c9c0ba]">{label}</p><p className="mt-1 text-[10px] leading-5 text-[#77798a]">{copy}</p></div><button onClick={() => onChange(!value)} className={`relative h-6 w-11 shrink-0 rounded-full transition ${value ? 'bg-[#e47a58]' : 'bg-[#3b3d4d]'}`} role="switch" aria-checked={value} data-testid={testId}><span className={`absolute top-1 h-4 w-4 rounded-full bg-[#f5ebdb] transition-transform ${value ? 'translate-x-6' : 'translate-x-1'}`} /></button></div>;
+}
+
+function NotFound() {
+  return <div className="mx-auto max-w-[700px] px-6 py-28 text-center"><p className="font-mono-ui text-[10px] uppercase tracking-[.24em] text-[#df8265]">404 · reel missing</p><h1 className="mt-4 font-display text-5xl text-[#f0e5d5]">That scene is not here.</h1><p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-[#858796]">The title or page you are looking for may have been moved.</p><Link href="/" className="mt-7 inline-flex items-center gap-2 rounded-lg bg-[#e47a58] px-4 py-2.5 text-xs font-bold text-[#211923]" data-testid="link-not-found-home">Return home <ArrowRight size={14} /></Link></div>;
+}
+
+export default App;
