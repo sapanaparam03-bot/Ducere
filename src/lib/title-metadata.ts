@@ -183,40 +183,51 @@ const aniListMetadata = async (title: Title) => {
   };
 };
 
+const wikipediaArtwork = async (title: string) => {
+  const params = new URLSearchParams({
+    action: 'query',
+    generator: 'search',
+    gsrsearch: title,
+    gsrnamespace: '0',
+    gsrlimit: '1',
+    prop: 'pageimages',
+    piprop: 'thumbnail',
+    pithumbsize: '600',
+    format: 'json',
+    origin: '*',
+  });
+  try {
+    const json = await fetchWithTimeout<{ query?: { pages?: Record<string, { thumbnail?: { source?: string } }> } }>(
+      `https://en.wikipedia.org/w/api.php?${params.toString()}`,
+    );
+    return Object.values(json.query?.pages ?? {})[0]?.thumbnail?.source ?? null;
+  } catch {
+    return null;
+  }
+};
+
 export async function resolvePosterFallback(title: Title): Promise<string | null> {
   const key = `poster:${title.id}`;
   const cached = metadataCache.get(key);
   if (cached?.poster) return cached.poster;
 
+  let poster: string | null = null;
   try {
-    let poster: string | null = null;
-    if (title.type === 'tv') poster = await tvMazeImage(title);
-    else if (title.type === 'anime') {
+    if (title.type === 'tv') {
+      poster = await tvMazeImage(title);
+    } else if (title.type === 'anime') {
       const result = await aniListMedia(title);
       poster = result.data?.Media?.coverImage?.extraLarge ?? result.data?.Media?.coverImage?.large ?? null;
     } else {
-      const params = new URLSearchParams({
-        action: 'query',
-        generator: 'search',
-        gsrsearch: title.name,
-        gsrnamespace: '0',
-        gsrlimit: '1',
-        prop: 'pageimages',
-        piprop: 'thumbnail',
-        pithumbsize: '600',
-        format: 'json',
-        origin: '*',
-      });
-      const json = await fetchWithTimeout<{ query?: { pages?: Record<string, { thumbnail?: { source?: string } }> } }>(
-        `https://en.wikipedia.org/w/api.php?${params.toString()}`,
-      );
-      poster = Object.values(json.query?.pages ?? {})[0]?.thumbnail?.source ?? null;
+      poster = await wikipediaArtwork(title.name);
     }
-    metadataCache.set(key, poster ? { poster } : {});
-    return poster;
   } catch {
-    return null;
+    poster = null;
   }
+
+  if (!poster) poster = await wikipediaArtwork(title.name);
+  metadataCache.set(key, poster ? { poster } : {});
+  return poster;
 }
 
 export async function getTitleMetadata(title: Title): Promise<Partial<Title>> {
