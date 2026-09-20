@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import { supabase } from '@/lib/supabase';
+import { getTitleMetadata, resolvePosterFallback } from '@/lib/title-metadata';
 
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -310,13 +311,12 @@ function PosterCard({ title, userTitle, onStatus }: { title: Title; userTitle?: 
   }, [title.id, title.name, title.poster, title.type]);
 
   const handleError = () => {
-    if (poster !== title.poster && poster.startsWith('https://en.wikipedia.org/')) {
-      setBroken(true);
-      return;
-    }
-    void findWikipediaArtwork(title.name).then((source) => {
-      if (source) setPoster(source);
-      else setBroken(true);
+    void resolvePosterFallback(title).then((source) => {
+      if (source && source !== poster) {
+        setPoster(source);
+      } else {
+        setBroken(true);
+      }
     });
   };
 
@@ -489,9 +489,24 @@ function HistoryRow({ title, item }: { title: Title; item: DucereProps['userTitl
 }
 
 function TitleDetailsPage(props: DucereProps) {
-  const { id } = useParams<{ id: string }>(); const title = findTitle(props.catalog, id ?? '');
+  const { id } = useParams<{ id: string }>();
+  const title = findTitle(props.catalog, id ?? '');
+  const [enrichedTitle, setEnrichedTitle] = useState<Title | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setEnrichedTitle(null);
+    if (!title || title.type === 'movie') return () => { active = false; };
+    void getTitleMetadata(title).then((metadata) => {
+      if (active && Object.keys(metadata).length) setEnrichedTitle({ ...title, ...metadata });
+    });
+    return () => {
+      active = false;
+    };
+  }, [title?.id, title?.name, title?.type]);
+
   if (!title) return <NotFound />;
-  return <TitleDetails title={title} {...props} />;
+  return <TitleDetails title={enrichedTitle ?? title} {...props} />;
 }
 
 function TitleDetails({ title, getUserTitle, upsert, setStatus, remove, setEpisodeProgress }: { title: Title } & DucereProps) {
