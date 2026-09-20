@@ -14,6 +14,19 @@ type TvMazeShow = {
   webChannel?: { name?: string | null } | null;
 };
 
+type WikipediaPage = {
+  pageid?: number;
+  title?: string;
+  thumbnail?: { source?: string | null } | null;
+  extract?: string | null;
+};
+
+type WikipediaCategoryResponse = {
+  query?: {
+    pages?: Record<string, WikipediaPage>;
+  };
+};
+
 type JikanAnime = {
   mal_id: number;
   title: string;
@@ -27,7 +40,7 @@ type JikanAnime = {
 };
 
 
-const CACHE_KEY = 'ducere-live-catalog-v4';
+const CACHE_KEY = 'ducere-live-catalog-v5';
 const CACHE_TTL = 1000 * 60 * 60 * 24;
 
 const stripMarkup = (value: string | null | undefined) =>
@@ -79,6 +92,62 @@ const jikanTitle = (anime: JikanAnime): Title => {
   };
 };
 
+const wikipediaCategory = async (category: string): Promise<Title[]> => {
+  const params = new URLSearchParams({
+    action: 'query',
+    generator: 'categorymembers',
+    gcmtitle: `Category:${category}`,
+    gcmtype: 'page',
+    gcmlimit: '50',
+    prop: 'pageimages|extracts',
+    piprop: 'thumbnail',
+    pithumbsize: '600',
+    exintro: '1',
+    explaintext: '1',
+    format: 'json',
+    origin: '*',
+  });
+  const result = await fetchJson<WikipediaCategoryResponse>(`https://en.wikipedia.org/w/api.php?${params.toString()}`);
+  return Object.entries(result.query?.pages ?? {}).flatMap(([pageId, page]) => {
+    const name = page.title?.trim();
+    const poster = page.thumbnail?.source;
+    if (!name || !poster) return [];
+    return [{
+      id: `wiki-movie-${pageId}`,
+      name,
+      type: 'movie',
+      poster,
+      backdrop: poster,
+      description: page.extract?.trim() || 'A film indexed by Wikipedia.',
+      releaseYear: 0,
+      genres: ['Movie'],
+      rating: 0,
+      runtime: 'Feature film',
+      cast: ['Credits available from the linked reference'],
+      director: 'Wikipedia catalog',
+      providers: [{ name: 'Wikipedia · catalog reference', kind: 'info' }],
+    } satisfies Title];
+  });
+};
+
+const fetchAnimePage = async (page: number) => {
+  try {
+    const response = await fetchJson<{ data?: JikanAnime[] }>(`https://api.jikan.moe/v4/top/anime?filter=bypopularity&sfw=true&page=${page}&limit=25`);
+    return response.data ?? [];
+  } catch {
+    return [];
+  }
+};
+
+const fetchAnimePages = async () => {
+  const pages: JikanAnime[] = [];
+  for (let page = 1; page <= 4; page++) {
+    if (page > 1) await new Promise((resolve) => window.setTimeout(resolve, 350));
+    pages.push(...await fetchAnimePage(page));
+  }
+  return pages;
+};
+
 const readCache = (): Title[] | null => {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
@@ -114,21 +183,27 @@ export async function loadLiveCatalog(): Promise<Title[]> {
   const cached = readCache();
   if (cached?.length) return cached;
 
-  const [tvResult, animeResult] = await Promise.allSettled([
+  const [tvResult, animeResult, movieResult] = await Promise.allSettled([
     Promise.all(
-      Array.from({ length: 3 }, (_, page) =>
+      Array.from({ length: 6 }, (_, page) =>
         fetchJson<TvMazeShow[]>(`https://api.tvmaze.com/shows?page=${page}`),
       ),
     ),
-    fetchJson<{ data?: JikanAnime[] }>('https://api.jikan.moe/v4/top/anime?limit=30'),
+    fetchAnimePages(),
+    Promise.all([
+      wikipediaCategory('2010s films'),
+      wikipediaCategory('2020s films'),
+    ]),
   ]);
 
   const tvPages = tvResult.status === 'fulfilled' ? tvResult.value : [];
-  const animePage = animeResult.status === 'fulfilled' ? animeResult.value : { data: [] };
+  const animeItems = animeResult.status === 'fulfilled' ? animeResult.value : [];
+  const moviePages = movieResult.status === 'fulfilled' ? movieResult.value : [];
 
   const remoteTitles = [
     ...tvPages.flat().map(tvMazeTitle),
-    ...(animePage.data ?? []).map(jikanTitle),
+    ...animeItems.map(jikanTitle),
+    ...moviePages.flat(),
   ];
 
   const seen = new Set<string>();
