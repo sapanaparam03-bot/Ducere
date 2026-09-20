@@ -10,12 +10,15 @@ import { coverArt, formatStatus, titleById, TITLES, type Title, type TitleType, 
 import {
   ArrowRight, Bookmark, Check, ChevronDown, ChevronRight, CirclePlay, Compass, Film,
   History, Home, Library, MapPin, Moon, MoreHorizontal, PlayCircle, RotateCcw, Search,
-  Settings, SlidersHorizontal, Sparkles, Star, Trash2, UserRound, CheckCircle2
+  Settings, SlidersHorizontal, Sparkles, Star, Trash2, UserRound, CheckCircle2, CalendarDays
 } from 'lucide-react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import { supabase } from '@/lib/supabase';
 import { getTitleMetadata, resolvePosterFallback } from '@/lib/title-metadata';
 import { SUBSCRIPTION_PROVIDERS, providerKeyForName } from '@/lib/providers';
+import { CalendarPage } from '@/components/calendar-page';
+import { rankRecommendations, calculateViewingMinutes } from '@/lib/personalization';
+import { AchievementPanel } from '@/components/achievement-panel';
 
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -51,6 +54,7 @@ const navItems = [
   { href: '/watchlist', label: 'Watchlist', icon: Bookmark },
   { href: '/watching', label: 'Watching', icon: PlayCircle },
   { href: '/history', label: 'History', icon: History },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
 ];
 
 const typeTint: Record<TitleType, string> = {
@@ -107,6 +111,7 @@ function DucereApp() {
           <Route path="/watchlist" component={() => <CollectionPage {...shared} status="watchlist" />} />
           <Route path="/watching" component={() => <CollectionPage {...shared} status="watching" />} />
           <Route path="/history" component={() => <HistoryPage {...shared} />} />
+          <Route path="/calendar" component={() => <CalendarPage userTitles={shared.userTitles} catalog={shared.catalog} region={shared.profile.country} />} />
           <Route path="/title/:id" component={() => <TitleDetailsPage {...shared} />} />
           <Route path="/profile" component={() => <ProfilePage {...shared} />} />
           <Route path="/settings" component={() => <SettingsPageV3 {...shared} />} />
@@ -349,7 +354,7 @@ function PosterCard({ title, userTitle, onStatus }: { title: Title; userTitle?: 
 function HomePage({ userTitles, profile, counts, getUserTitle, setStatus, upsert, catalog }: DucereProps) {
   const watching = userTitles.filter((item) => item.status === 'watching').map((item) => ({ item, title: findTitle(catalog, item.titleId)! })).filter((x) => x.title);
   const saved = userTitles.filter((item) => item.status === 'watchlist').map((item) => ({ item, title: findTitle(catalog, item.titleId)! })).filter((x) => x.title);
-  const recommendations = catalog.filter((title) => !userTitles.some((item) => item.titleId === title.id)).slice(0, 5);
+  const recommendations = rankRecommendations(userTitles, catalog).slice(0, 5).map(({ title }) => title);
   return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12">
     <div className="fade-up relative mb-12 overflow-hidden rounded-[18px] border border-[#68453f]/40 bg-[#211e2b] px-6 py-9 sm:px-10 sm:py-11">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_25%,rgba(228,122,88,.22),transparent_28%),radial-gradient(circle_at_45%_120%,rgba(92,71,116,.26),transparent_40%)]" />
@@ -411,7 +416,7 @@ function ContinueCard({ title, item, onFinish, onProgress, onEpisodeProgress }: 
 }
 
 function StatTile({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
-  return <div className="panel-soft rounded-xl px-4 py-4"><div className="mb-4 flex items-center justify-between text-[#df8265]">{icon}<span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#6f7181]">2024</span></div><p className="text-2xl font-bold tracking-[-.04em] text-[#eee4d5]">{value}</p><p className="mt-1 text-[11px] text-[#898b99]">{label}</p></div>;
+  return <div className="panel-soft rounded-xl px-4 py-4"><div className="mb-4 flex items-center justify-between text-[#df8265]">{icon}<span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#6f7181]">{new Date().getFullYear()}</span></div><p className="text-2xl font-bold tracking-[-.04em] text-[#eee4d5]">{value}</p><p className="mt-1 text-[11px] text-[#898b99]">{label}</p></div>;
 }
 
 function EmptyState({ icon, title, copy, href, action }: { icon: ReactNode; title: string; copy: string; href: string; action: string }) {
@@ -446,19 +451,14 @@ function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalo
     });
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([genre]) => genre);
   }, [userTitles, catalog]);
-  const recommendations = useMemo(() => catalog
-    .filter((title) => !userTitles.some((item) => item.titleId === title.id))
-    .map((title) => ({ title, score: title.genres.reduce((sum, genre) => sum + (likedGenres.includes(genre) ? 3 : 0), 0) + title.rating }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 6)
-    .map(({ title }) => title), [catalog, userTitles, likedGenres]);
+  const recommendations = useMemo(() => rankRecommendations(userTitles, catalog).slice(0, 6), [catalog, userTitles]);
   return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12">
     <PageIntro eyebrow="Discover" title="Find your next film." description="A curated shelf backed by a growing live index of series and anime. Search by title, genre, or mood." />
     <div className="mb-10 flex flex-col gap-3 sm:flex-row">
       <div className="relative flex-1"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777989]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Try “quiet sci-fi” or “Breaking Bad”" className="h-12 w-full rounded-xl border border-[#303345] bg-[#171a27] pl-11 pr-4 text-sm outline-none placeholder:text-[#686a7a] focus:border-[#d17459]" data-testid="input-discover-search" /></div>
       <div className="flex gap-2 overflow-x-auto">{(['all', 'movie', 'tv', 'anime'] as const).map((filter) => <button key={filter} onClick={() => setType(filter)} className={`rounded-xl px-4 py-2 text-[11px] font-bold capitalize transition ${type === filter ? 'bg-[#e47a58] text-[#211923]' : 'border border-[#303345] text-[#9495a3] hover:border-[#765045]'}`} data-testid={`button-filter-${filter}`}>{filter === 'all' ? 'Everything' : filter === 'tv' ? 'Series' : filter}</button>)}</div>
     </div>
-    {!search && type === 'all' && recommendations.length > 0 && <section className="mb-10"><SectionHeading eyebrow="For your taste" title={likedGenres.length ? "Because you watch " + likedGenres[0] : 'A few places to start'} /><div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">{recommendations.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div></section>}
+    {!search && type === 'all' && recommendations.length > 0 && <section className="mb-10"><SectionHeading eyebrow="For your taste" title={likedGenres.length ? "Because you watch " + likedGenres[0] : 'A few places to start'} /><div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">{recommendations.map(({ title, reasons }) => <div key={title.id} className="space-y-2"><PosterCard title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />{reasons[0] && <p className="px-1 text-[9px] text-[#777989]">{reasons[0]}</p>}</div>)}</div></section>}
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-[#777989]"><span className="font-bold text-[#e2d8c8]">{results.length}</span> titles indexed{catalogLoading ? ' · loading more from live sources' : ''}</p><span className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#666879]">Curated + live catalog</span></div>
     {catalogError && <div className="mb-5 rounded-xl border border-[#6a493f] bg-[#31252a] px-4 py-3 text-xs text-[#c6aaa1]">{catalogError}</div>}
     {visible.length ? <><div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{visible.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div>{visible.length < results.length && <div className="flex justify-center py-12"><button onClick={() => setVisibleCount((current) => current + 144)} className="rounded-xl border border-[#6a4038] px-5 py-3 text-xs font-bold text-[#e78b6c] transition hover:bg-[#e47a58]/10" data-testid="button-load-more">Load more titles <span className="ml-1 text-[#9c7f77]">({results.length - visible.length} remaining)</span></button></div>}</> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}
@@ -620,7 +620,11 @@ function ProfilePage({ profile, userTitles, counts, catalog }: DucereProps) {
     const perEpisode = title.type === 'anime' ? 24 : 45;
     return episodes * perEpisode;
   };
-  const estimatedHours = Math.round(userTitles.reduce((sum, item) => sum + estimateMinutes(item), 0) / 60);
+  const totalMinutes = Math.round(calculateViewingMinutes(userTitles, catalog));
+  const estimatedHours = Math.round(totalMinutes / 60);
+  const moviesWatched = watchedTitles.filter((item) => catalog.find((title) => title.id === item.titleId)?.type === 'movie').length;
+  const seriesWatched = watchedTitles.filter((item) => catalog.find((title) => title.id === item.titleId)?.type === 'tv').length;
+  const animeWatched = watchedTitles.filter((item) => catalog.find((title) => title.id === item.titleId)?.type === 'anime').length;
   const recent = userTitles.slice().sort((a, b) => (b.dateWatched ?? b.dateAdded).localeCompare(a.dateWatched ?? a.dateAdded)).slice(0, 8);
   return <div className="mx-auto max-w-[1200px] px-5 py-9 sm:px-8 lg:px-12">
     <PageIntro eyebrow="Your archive" title={`${profile.username}'s cinema.`} description="A small portrait of what you make time for." action={<Link href="/settings" className="flex items-center gap-2 rounded-lg border border-[#353646] px-3 py-2 text-[11px] font-semibold text-[#aaa8aa]" data-testid="link-profile-settings"><Settings size={14} /> Edit profile</Link>} />
@@ -634,6 +638,12 @@ function ProfilePage({ profile, userTitles, counts, catalog }: DucereProps) {
       <div className="panel rounded-2xl p-6"><SectionHeading eyebrow="Your activity" title="Recent movements" /><div className="mt-5 space-y-5">{recent.map((item, index) => { const title = catalog.find((candidate) => candidate.id === item.titleId) ?? titleById(item.titleId); if (!title) return null; return <div key={item.titleId} className="flex items-center gap-3"><div className={`flex h-8 w-8 items-center justify-center rounded-lg ${index % 2 ? 'bg-[#d5af71]/10 text-[#d5af71]' : 'bg-[#e47a58]/10 text-[#e47a58]'}`}>{item.status === 'watched' ? <Check size={15} /> : item.status === 'watching' ? <PlayCircle size={15} /> : <Bookmark size={15} />}</div><p className="text-xs text-[#aaa6a4]"><span className="font-bold text-[#dfd6ca]">{formatStatus(item.status)}</span> <Link href={`/title/${title.id}`} className="text-[#df8265] hover:underline">{title.name}</Link><span className="block mt-1 font-mono-ui text-[9px] text-[#6f7180]">{item.dateWatched ?? item.dateAdded}</span></p></div>; })}</div></div>
       <div className="panel rounded-2xl p-6"><SectionHeading eyebrow="Viewing fingerprint" title="Your favorite worlds" /><div className="mt-5 space-y-4">{topGenres.length ? topGenres.map(([genre, value]) => <div key={genre}><div className="mb-2 flex justify-between text-[11px]"><span className="text-[#b8b1ad]">{genre}</span><span className="font-mono-ui text-[#777989]">{Math.round((value / maxGenre) * 100)}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#292b3a]"><div className="h-full rounded-full bg-[#e47a58]" style={{ width: `${Math.round((value / maxGenre) * 100)}%` }} /></div></div>) : <p className="text-xs leading-6 text-[#777989]">Watch or rate a few titles and Ducere will build your viewing fingerprint here.</p>}</div></div>
     </div>
+    <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="panel-soft rounded-xl p-4"><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#df8265]">Movies</p><p className="mt-3 text-2xl font-bold text-[#eee4d5]">{moviesWatched}</p><p className="mt-1 text-[10px] text-[#777989]">completed or in progress</p></div>
+      <div className="panel-soft rounded-xl p-4"><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#df8265]">Series</p><p className="mt-3 text-2xl font-bold text-[#eee4d5]">{seriesWatched}</p><p className="mt-1 text-[10px] text-[#777989]">completed or in progress</p></div>
+      <div className="panel-soft rounded-xl p-4"><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#df8265]">Anime</p><p className="mt-3 text-2xl font-bold text-[#eee4d5]">{animeWatched}</p><p className="mt-1 text-[10px] text-[#777989]">completed or in progress</p></div>
+    </div>
+    <div className="mt-6"><AchievementPanel userTitles={userTitles} catalog={catalog} /></div>
   </div>;
 }
 
