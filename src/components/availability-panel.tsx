@@ -32,7 +32,8 @@ export function AvailabilityPanel({ title, region, subscriptions }: Props) {
       if (active) setResult(next);
     }).catch((error) => {
       if (!active) return;
-      const code = error?.context?.body?.code ?? error?.context?.code ?? error?.message ?? '';
+      const details = error as { message?: string; context?: { code?: string; body?: { code?: string } } };
+      const code = details.context?.body?.code ?? details.context?.code ?? details.message ?? '';
       setMessage(String(code).includes('WATCHMODE_NOT_CONFIGURED')
         ? 'Verified availability is ready to connect, but its data provider is not configured yet.'
         : 'Verified availability is temporarily unavailable. No unverified service is being presented as confirmed.');
