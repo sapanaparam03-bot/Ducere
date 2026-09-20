@@ -27,7 +27,7 @@ type JikanAnime = {
 };
 
 
-const CACHE_KEY = 'ducere-live-catalog-v3';
+const CACHE_KEY = 'ducere-live-catalog-v4';
 const CACHE_TTL = 1000 * 60 * 60 * 12;
 
 const stripMarkup = (value: string | null | undefined) =>
@@ -44,8 +44,8 @@ const tvMazeTitle = (show: TvMazeShow): Title => {
     id: `tvmaze-${show.id}`,
     name: show.name,
     type: 'tv',
-    poster: coverArt(show.name, 'tv'),
-    backdrop: coverArt(show.name, 'tv'),
+    poster: show.image?.original ?? show.image?.medium ?? coverArt(show.name, 'tv'),
+    backdrop: show.image?.original ?? show.image?.medium ?? coverArt(show.name, 'tv'),
     description: stripMarkup(show.summary) || 'A series from the live Ducere catalog.',
     releaseYear: yearFrom(show.premiered),
     genres: show.genres?.length ? show.genres : ['Series'],
@@ -64,8 +64,8 @@ const jikanTitle = (anime: JikanAnime): Title => {
     id: `jikan-${anime.mal_id}`,
     name: anime.title,
     type: 'anime',
-    poster: coverArt(anime.title, 'anime'),
-    backdrop: coverArt(anime.title, 'anime'),
+    poster: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? coverArt(anime.title, 'anime'),
+    backdrop: anime.images?.jpg?.large_image_url ?? anime.images?.jpg?.image_url ?? coverArt(anime.title, 'anime'),
     description: anime.synopsis?.trim() || 'An anime title from the live Ducere catalog.',
     releaseYear: yearFrom(anime.aired?.from),
     genres: anime.genres?.map((genre) => genre.name).slice(0, 4) ?? ['Anime'],
