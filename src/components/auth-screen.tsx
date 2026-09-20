@@ -23,10 +23,20 @@ export function AuthScreen() {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { username: username.trim() || 'Viewer' } },
+        options: {
+          data: { username: username.trim() || 'Viewer' },
+          emailRedirectTo: window.location.origin,
+        },
       });
       if (error) {
-        setMessage(error.message);
+        const message = error.message.toLowerCase();
+        if (error.status === 429 || message.includes('rate limit') || message.includes('rate exceeded')) {
+          setMessage('Supabase has temporarily rate-limited confirmation emails. Your signup may already exist; check your inbox/spam before trying again.');
+        } else if (message.includes('already registered')) {
+          setMessage('This email is already registered. Switch to Sign in.');
+        } else {
+          setMessage(error.message);
+        }
       } else if (!data.session) {
         setMessage('Account created. Check your email to confirm your account, then sign in.');
       } else {
@@ -37,7 +47,14 @@ export function AuthScreen() {
         email: email.trim(),
         password,
       });
-      if (error) setMessage(error.message);
+      if (error) {
+        const message = error.message.toLowerCase();
+        if (message.includes('email not confirmed')) {
+          setMessage('Your account exists, but the email is not confirmed yet. Check your confirmation email.');
+        } else {
+          setMessage(error.message);
+        }
+      }
     }
     setBusy(false);
   };
