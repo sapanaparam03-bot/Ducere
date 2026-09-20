@@ -125,6 +125,40 @@ export function downloadDucereBackup(profile: Profile, userTitles: UserTitle[]) 
   URL.revokeObjectURL(url);
 }
 
+const csvCell = (value: string | number | undefined | null) => {
+  const text = String(value ?? '');
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+export function downloadDucereCsv(userTitles: UserTitle[], catalog: Title[]) {
+  const header = ['Title', 'Type', 'Year', 'Status', 'Date Added', 'Date Watched', 'Rating', 'Review', 'Season', 'Episode', 'Progress'];
+  const rows = userTitles.map((item) => {
+    const title = catalog.find((candidate) => candidate.id === item.titleId);
+    return [
+      csvCell(title?.name ?? item.titleId),
+      csvCell(title?.type ?? ''),
+      csvCell(title?.releaseYear ?? ''),
+      csvCell(item.status),
+      csvCell(item.dateAdded),
+      csvCell(item.dateWatched),
+      csvCell(item.rating),
+      csvCell(item.review),
+      csvCell(item.currentSeason),
+      csvCell(item.currentEpisode),
+      csvCell(item.progress),
+    ].join(',');
+  });
+  const blob = new Blob([[header.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `ducere-library-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function parseDucereBackup(text: string): DucereBackup {
   const parsed = JSON.parse(text) as Partial<DucereBackup>;
   if (parsed.format !== 'ducere-backup' || parsed.version !== 1 || !parsed.profile || !Array.isArray(parsed.titles)) {
