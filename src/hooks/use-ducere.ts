@@ -220,6 +220,15 @@ export function useDucere() {
     setDataError(null);
   }, [userId]);
 
+  const deleteAccount = useCallback(async () => {
+    if (!userId || !supabase) throw new Error('Account deletion is not available.');
+    const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+    if (error) throw new Error('Account deletion failed. Please try again.');
+    localStorage.removeItem(`${USER_KEY}:${userId}`);
+    localStorage.removeItem(`${PROFILE_KEY}:${userId}`);
+    await supabase.auth.signOut();
+  }, [userId]);
+
   const counts = useMemo(() => ({
     all: userTitles.length,
     watchlist: userTitles.filter((item) => item.status === 'watchlist').length,
@@ -227,5 +236,5 @@ export function useDucere() {
     watched: userTitles.filter((item) => item.status === 'watched').length,
   }), [userTitles]);
 
-  return { userTitles, profile, ready, userId, dataError, getUserTitle, upsert, remove, setStatus, setProgress, setEpisodeProgress, updateProfile, resetData, counts };
+  return { userTitles, profile, ready, userId, dataError, getUserTitle, upsert, remove, setStatus, setProgress, setEpisodeProgress, updateProfile, resetData, deleteAccount, counts };
 }
