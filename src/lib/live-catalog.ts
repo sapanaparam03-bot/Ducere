@@ -191,6 +191,8 @@ export async function loadLiveCatalog(): Promise<Title[]> {
     ),
     fetchAnimePages(),
     Promise.all([
+      wikipediaCategory('1990s films'),
+      wikipediaCategory('2000s films'),
       wikipediaCategory('2010s films'),
       wikipediaCategory('2020s films'),
     ]),
