@@ -758,7 +758,7 @@ function ImportPanel({ catalog, upsert, profile, userTitles, updateProfile }: { 
         <Upload size={14} /> <span>{busy ? 'Reading…' : 'Import CSV / JSON'}</span>
         <input type="file" accept=".csv,.json,text/csv,application/json" className="hidden" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFile(file); e.currentTarget.value = ''; }} data-testid="input-import-archive" />
       </label>
-      <button onClick={() => downloadDucereBackup(profile, userTitles)} className="inline-flex items-center gap-2 rounded-lg border border-[#414355] px-4 py-2.5 text-xs font-bold text-[#aaa7ad] hover:border-[#d17459] hover:text-[#e47a58]" data-testid="button-export-backup"><Download size={14} /> Export Ducere backup</button>
+      <button onClick={() => downloadDucereBackup(profile, userTitles)} className="inline-flex items-center gap-2 rounded-lg border border-[#414355] px-4 py-2.5 text-xs font-bold text-[#aaa7ad] hover:border-[#d17459] hover:text-[#e47a58]" data-testid="button-export-backup"><Download size={14} /> Export Ducere backup</button><button onClick={() => downloadDucereCsv(userTitles, catalog)} className="inline-flex items-center gap-2 rounded-lg border border-[#353747] px-4 py-2.5 text-xs font-semibold text-[#9896a1] hover:border-[#4a4d60] hover:text-[#d1c9bf]" data-testid="button-export-csv"><Download size={14} /> Export CSV</button>
     </div>
     {message && <p className="mt-3 text-[11px] leading-5 text-[#87bd9d]" data-testid="text-import-result">{message}</p>}
   </div>;
