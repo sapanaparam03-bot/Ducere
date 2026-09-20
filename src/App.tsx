@@ -251,33 +251,90 @@ function SectionHeading({ eyebrow, title, href, linkLabel = 'See all' }: { eyebr
   return <div className="mb-4 flex items-end justify-between"><div><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">{eyebrow}</p><h2 className="mt-1 text-lg font-bold tracking-[-.02em] text-[#e9e1d6]">{title}</h2></div>{href && <Link href={href} className="flex items-center gap-1 text-xs font-semibold text-[#bd8a78] transition hover:text-[#eda07f]" data-testid={`link-see-${title.toLowerCase().replaceAll(' ', '-')}`}>{linkLabel}<ArrowRight size={14} /></Link>}</div>;
 }
 
+const wikiImageCache = new Map<string, string | null>();
+
+async function findWikipediaArtwork(title: string) {
+  const key = title.trim().toLowerCase();
+  if (wikiImageCache.has(key)) return wikiImageCache.get(key) ?? null;
+  try {
+    const params = new URLSearchParams({
+      action: 'query',
+      generator: 'search',
+      gsrsearch: title,
+      gsrnamespace: '0',
+      gsrlimit: '1',
+      prop: 'pageimages',
+      piprop: 'thumbnail',
+      pithumbsize: '600',
+      format: 'json',
+      origin: '*',
+    });
+    const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`);
+    if (!response.ok) throw new Error('Wikipedia artwork request failed');
+    const json = await response.json() as { query?: { pages?: Record<string, { thumbnail?: { source?: string } }> } };
+    const source = Object.values(json.query?.pages ?? {})[0]?.thumbnail?.source ?? null;
+    wikiImageCache.set(key, source);
+    return source;
+  } catch {
+    wikiImageCache.set(key, null);
+    return null;
+  }
+}
+
 function PosterCard({ title, userTitle, onStatus }: { title: Title; userTitle?: DucereProps['userTitles'][number]; onStatus?: (status: UserStatus) => void }) {
+  const [poster, setPoster] = useState(title.poster);
   const [broken, setBroken] = useState(false);
-  return <div className="poster-card min-w-0" data-testid={`card-title-${title.id}`}>
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (title.type !== 'movie' || !title.poster.startsWith('data:')) return;
+    const node = cardRef.current;
+    if (!node) return;
+    const load = () => {
+      void findWikipediaArtwork(title.name).then((source) => {
+        if (source) setPoster(source);
+      });
+    };
+    if (!('IntersectionObserver' in window)) {
+      load();
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        observer.disconnect();
+        load();
+      }
+    }, { rootMargin: '300px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [title.id, title.name, title.poster, title.type]);
+
+  const handleError = () => {
+    if (poster !== title.poster && poster.startsWith('https://en.wikipedia.org/')) {
+      setBroken(true);
+      return;
+    }
+    void findWikipediaArtwork(title.name).then((source) => {
+      if (source) setPoster(source);
+      else setBroken(true);
+    });
+  };
+
+  return <div ref={cardRef} className="poster-card min-w-0" data-testid={`card-title-${title.id}`}>
     <div className={`relative aspect-[2/3] overflow-hidden rounded-[10px] bg-gradient-to-br ${typeTint[title.type]} shadow-[0_8px_20px_rgba(0,0,0,.2)]`}>
       {!broken && <img
-        src={title.poster}
+        src={poster}
         alt={`${title.name} poster`}
         className="h-full w-full object-cover"
         loading="lazy"
         decoding="async"
-        onError={(event) => {
-          const image = event.currentTarget;
-          if (image.dataset.fallback === 'backdrop') {
-            image.src = coverArt(title.name, title.type);
-          } else if (title.backdrop && image.src !== title.backdrop) {
-            image.dataset.fallback = 'backdrop';
-            image.src = title.backdrop;
-          } else {
-            setBroken(true);
-          }
-        }}
+        onError={handleError}
       />}
-      {broken && <div className="absolute inset-0 flex flex-col justify-end p-4"><Film size={20} className="mb-auto text-white/35" /><p className="font-display text-xl leading-tight text-[#f2dfcf]">{title.name}</p><p className="mt-2 font-mono-ui text-[9px] uppercase tracking-[.16em] text-white/45">{title.releaseYear} · {title.type}</p></div>}
+      {broken && <div className="absolute inset-0 flex flex-col justify-end p-4"><Film size={20} className="mb-auto text-white/35" /><p className="font-display text-xl leading-tight text-[#f2dfcf]">{title.name}</p><p className="mt-2 font-mono-ui text-[9px] uppercase tracking-[.16em] text-white/45">{title.releaseYear > 0 ? title.releaseYear : 'Catalog'} · {title.type}</p></div>}
       <div className="poster-overlay absolute inset-0 flex items-end bg-gradient-to-t from-[#10111a] via-transparent to-transparent p-3"><Link href={`/title/${title.id}`} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#f2dfcf]/95 py-2 text-[11px] font-bold text-[#201b22]" data-testid={`link-open-title-${title.id}`}><MoreHorizontal size={14} /> View title</Link></div>
       {userTitle && <span className={`absolute left-2 top-2 rounded-md px-2 py-1 font-mono-ui text-[8px] uppercase tracking-[.1em] backdrop-blur ${userTitle.status === 'watching' ? 'bg-[#e47a58]/90 text-[#211923]' : userTitle.status === 'watched' ? 'bg-[#d5af71]/90 text-[#211923]' : 'bg-[#1a1c29]/85 text-[#e8ded2]'}`}>{userTitle.status === 'watching' ? 'In progress' : userTitle.status === 'watched' ? 'Watched' : 'Saved'}</span>}
     </div>
-    <div className="mt-3 flex items-start justify-between gap-2"><Link href={`/title/${title.id}`} className="min-w-0" data-testid={`link-title-${title.id}`}><h3 className="truncate text-[13px] font-bold text-[#e9e0d4]">{title.name}</h3><p className="mt-1 font-mono-ui text-[9px] uppercase tracking-[.11em] text-[#747687]">{title.releaseYear} · {title.type}</p></Link><span className="mt-0.5 flex shrink-0 items-center gap-1 text-[10px] text-[#d6ae6f]"><Star size={10} fill="currentColor" />{title.rating}</span></div>
+    <div className="mt-3 flex items-start justify-between gap-2"><Link href={`/title/${title.id}`} className="min-w-0" data-testid={`link-title-${title.id}`}><h3 className="truncate text-[13px] font-bold text-[#e9e0d4]">{title.name}</h3><p className="mt-1 font-mono-ui text-[9px] uppercase tracking-[.11em] text-[#747687]">{title.releaseYear > 0 ? title.releaseYear : 'Catalog'} · {title.type}</p></Link><span className="mt-0.5 flex shrink-0 items-center gap-1 text-[10px] text-[#d6ae6f]">{title.rating > 0 ? <><Star size={10} fill="currentColor" />{title.rating}</> : '—'}</span></div>
     {onStatus && <button className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-[#9193a3] transition hover:text-[#e47a58]" onClick={() => onStatus(userTitle?.status === 'watchlist' ? 'watching' : 'watchlist')} data-testid={`button-toggle-status-${title.id}`}>{userTitle?.status === 'watchlist' ? <><PlayCircle size={12} /> Start watching</> : <><Bookmark size={12} /> Save for later</>}</button>}
   </div>;
 }
@@ -366,8 +423,8 @@ function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalo
   const query = new URLSearchParams(window.location.search).get('q') ?? '';
   const [search, setSearch] = useState(query);
   const [type, setType] = useState<'all' | TitleType>('all');
-  const [visibleCount, setVisibleCount] = useState(96);
-  useEffect(() => setVisibleCount(96), [search, type]);
+  const [visibleCount, setVisibleCount] = useState(144);
+  useEffect(() => setVisibleCount(144), [search, type]);
   const results = useMemo(
     () => catalog.filter((title) => (type === 'all' || title.type === type) && `${title.name} ${title.genres.join(' ')} ${title.description}`.toLowerCase().includes(search.toLowerCase())),
     [catalog, search, type],
@@ -397,7 +454,7 @@ function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalo
     {!search && type === 'all' && recommendations.length > 0 && <section className="mb-10"><SectionHeading eyebrow="For your taste" title={likedGenres.length ? "Because you watch " + likedGenres[0] : 'A few places to start'} /><div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">{recommendations.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div></section>}
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-[#777989]"><span className="font-bold text-[#e2d8c8]">{results.length}</span> titles indexed{catalogLoading ? ' · loading more from live sources' : ''}</p><span className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#666879]">Curated + live catalog</span></div>
     {catalogError && <div className="mb-5 rounded-xl border border-[#6a493f] bg-[#31252a] px-4 py-3 text-xs text-[#c6aaa1]">{catalogError}</div>}
-    {visible.length ? <><div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{visible.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div>{visible.length < results.length && <div className="flex justify-center py-12"><button onClick={() => setVisibleCount((current) => current + 96)} className="rounded-xl border border-[#6a4038] px-5 py-3 text-xs font-bold text-[#e78b6c] transition hover:bg-[#e47a58]/10" data-testid="button-load-more">Load more titles <span className="ml-1 text-[#9c7f77]">({results.length - visible.length} remaining)</span></button></div>}</> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}
+    {visible.length ? <><div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{visible.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div>{visible.length < results.length && <div className="flex justify-center py-12"><button onClick={() => setVisibleCount((current) => current + 144)} className="rounded-xl border border-[#6a4038] px-5 py-3 text-xs font-bold text-[#e78b6c] transition hover:bg-[#e47a58]/10" data-testid="button-load-more">Load more titles <span className="ml-1 text-[#9c7f77]">({results.length - visible.length} remaining)</span></button></div>}</> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}
   </div>;
 }
 
