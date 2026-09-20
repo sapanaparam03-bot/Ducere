@@ -21,13 +21,18 @@ export function useCatalog() {
           if (active) setLoading(false);
         });
     };
-    const idle = 'requestIdleCallback' in window
-      ? window.requestIdleCallback(start, { timeout: 1200 })
-      : window.setTimeout(start, 350);
+    let idleId: number;
+    let usedIdleCallback = false;
+    if ('requestIdleCallback' in window) {
+      usedIdleCallback = true;
+      idleId = window.requestIdleCallback(start, { timeout: 1200 });
+    } else {
+      idleId = window.setTimeout(start, 350);
+    }
     return () => {
       active = false;
-      if (typeof idle === 'number') window.clearTimeout(idle);
-      else window.cancelIdleCallback(idle);
+      if (usedIdleCallback) window.cancelIdleCallback(idleId);
+      else window.clearTimeout(idleId);
     };
   }, []);
 
