@@ -25,6 +25,10 @@ type WikipediaCategoryResponse = {
   query?: {
     pages?: Record<string, WikipediaPage>;
   };
+  continue?: {
+    gcmcontinue?: string;
+    continue?: string;
+  };
 };
 
 type JikanAnime = {
@@ -40,7 +44,7 @@ type JikanAnime = {
 };
 
 
-const CACHE_KEY = 'ducere-live-catalog-v5';
+const CACHE_KEY = 'ducere-live-catalog-v6';
 const CACHE_TTL = 1000 * 60 * 60 * 24;
 
 const stripMarkup = (value: string | null | undefined) =>
@@ -92,42 +96,58 @@ const jikanTitle = (anime: JikanAnime): Title => {
   };
 };
 
-const wikipediaCategory = async (category: string): Promise<Title[]> => {
-  const params = new URLSearchParams({
-    action: 'query',
-    generator: 'categorymembers',
-    gcmtitle: `Category:${category}`,
-    gcmtype: 'page',
-    gcmlimit: '50',
-    prop: 'pageimages|extracts',
-    piprop: 'thumbnail',
-    pithumbsize: '600',
-    exintro: '1',
-    explaintext: '1',
-    format: 'json',
-    origin: '*',
-  });
-  const result = await fetchJson<WikipediaCategoryResponse>(`https://en.wikipedia.org/w/api.php?${params.toString()}`);
-  return Object.entries(result.query?.pages ?? {}).flatMap(([pageId, page]) => {
-    const name = page.title?.trim();
-    const poster = page.thumbnail?.source;
-    if (!name || !poster) return [];
-    return [{
-      id: `wiki-movie-${pageId}`,
-      name,
-      type: 'movie',
-      poster,
-      backdrop: poster,
-      description: page.extract?.trim() || 'A film indexed by Wikipedia.',
-      releaseYear: 0,
-      genres: ['Movie'],
-      rating: 0,
-      runtime: 'Feature film',
-      cast: ['Credits available from the linked reference'],
-      director: 'Wikipedia catalog',
-      providers: [{ name: 'Wikipedia · catalog reference', kind: 'info' }],
-    } satisfies Title];
-  });
+const wikipediaCategory = async (category: string, pages = 3): Promise<Title[]> => {
+  let continuation: string | undefined;
+  const titles: Title[] = [];
+
+  for (let pageIndex = 0; pageIndex < pages; pageIndex++) {
+    const params = new URLSearchParams({
+      action: 'query',
+      generator: 'categorymembers',
+      gcmtitle: `Category:${category}`,
+      gcmtype: 'page',
+      gcmlimit: '50',
+      prop: 'pageimages|extracts',
+      piprop: 'thumbnail',
+      pithumbsize: '600',
+      exintro: '1',
+      explaintext: '1',
+      format: 'json',
+      origin: '*',
+    });
+    if (continuation) params.set('gcmcontinue', continuation);
+
+    try {
+      const result = await fetchJson<WikipediaCategoryResponse>(`https://en.wikipedia.org/w/api.php?${params.toString()}`);
+      titles.push(
+        ...Object.entries(result.query?.pages ?? {}).flatMap(([pageId, page]) => {
+          const name = page.title?.trim();
+          const poster = page.thumbnail?.source;
+          if (!name || !poster) return [];
+          return [{
+            id: `wiki-movie-${pageId}`,
+            name,
+            type: 'movie',
+            poster,
+            backdrop: poster,
+            description: page.extract?.trim() || 'A film indexed by Wikipedia.',
+            releaseYear: 0,
+            genres: ['Movie'],
+            rating: 0,
+            runtime: 'Feature film',
+            cast: ['Credits available from the linked reference'],
+            director: 'Wikipedia catalog',
+            providers: [{ name: 'Wikipedia · catalog reference', kind: 'info' }],
+          } satisfies Title];
+        }),
+      );
+      continuation = result.continue?.gcmcontinue;
+      if (!continuation) break;
+    } catch {
+      break;
+    }
+  }
+  return titles;
 };
 
 const fetchAnimePage = async (page: number) => {
@@ -141,7 +161,7 @@ const fetchAnimePage = async (page: number) => {
 
 const fetchAnimePages = async () => {
   const pages: JikanAnime[] = [];
-  for (let page = 1; page <= 4; page++) {
+  for (let page = 1; page <= 6; page++) {
     if (page > 1) await new Promise((resolve) => window.setTimeout(resolve, 350));
     pages.push(...await fetchAnimePage(page));
   }
@@ -185,16 +205,16 @@ export async function loadLiveCatalog(): Promise<Title[]> {
 
   const [tvResult, animeResult, movieResult] = await Promise.allSettled([
     Promise.all(
-      Array.from({ length: 6 }, (_, page) =>
+      Array.from({ length: 8 }, (_, page) =>
         fetchJson<TvMazeShow[]>(`https://api.tvmaze.com/shows?page=${page}`),
       ),
     ),
     fetchAnimePages(),
     Promise.all([
-      wikipediaCategory('1990s films'),
-      wikipediaCategory('2000s films'),
-      wikipediaCategory('2010s films'),
-      wikipediaCategory('2020s films'),
+      wikipediaCategory('1990s films', 3),
+      wikipediaCategory('2000s films', 3),
+      wikipediaCategory('2010s films', 3),
+      wikipediaCategory('2020s films', 3),
     ]),
   ]);
 
