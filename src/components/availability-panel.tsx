@@ -74,7 +74,13 @@ export function AvailabilityPanel({ title, region, subscriptions }: Props) {
   return <div className="panel h-fit rounded-2xl p-5 sm:p-7">
     <SectionTitle />
     {loading ? <div className="flex items-center gap-2 rounded-xl border border-[#303244] bg-[#181a28] px-3 py-4 text-[11px] text-[#858797]"><LoaderCircle size={14} className="animate-spin" /> Checking verified availability for {region}…</div>
-      : message ? <div className="rounded-xl border border-[#4f3f3d] bg-[#332528]/40 p-3 text-[10px] leading-5 text-[#a69a96]"><MapPin size={13} className="mb-1 text-[#df8265]" />{message}</div>
+      : message ? <div className="space-y-3">
+          <div className="rounded-xl border border-[#4f3f3d] bg-[#332528]/40 p-3 text-[10px] leading-5 text-[#a69a96]"><MapPin size={13} className="mb-1 text-[#df8265]" />{message}</div>
+          {title.providers?.length ? <div className="rounded-xl border border-[#303244] bg-[#181a28] p-3">
+            <p className="mb-2 text-[9px] font-bold uppercase tracking-[.15em] text-[#777989]">Catalogue references · not verified availability</p>
+            <div className="flex flex-wrap gap-2">{title.providers.map((provider) => <span key={`${provider.name}-reference`} className="rounded-full border border-[#3b3d4d] px-2.5 py-1 text-[10px] text-[#9b9aa6]">{provider.name}</span>)}</div>
+          </div> : null}
+        </div>
       : <div className="space-y-5">
         {subscriptions.length > 0 && <div><div className="mb-2 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-[#df8265]">Your services</p><span className="font-mono-ui text-[9px] text-[#777989]">{matchedSubscriptions.length}</span></div><div className="space-y-2">{matchedSubscriptions.length ? matchedSubscriptions.map(sourceRow) : <p className="rounded-xl border border-[#303244] bg-[#181a28] px-3 py-3 text-[10px] leading-5 text-[#777989]">None of your selected services currently show a verified match in {region}.</p>}</div></div>}
         <div><div className="mb-2 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-[#a6a0a0]">{subscriptions.length ? 'Other verified options' : 'Verified options'}</p><span className="font-mono-ui text-[9px] text-[#777989]">{otherVerified.length}</span></div><div className="space-y-2">{otherVerified.length ? otherVerified.map(sourceRow) : <p className="rounded-xl border border-[#303244] bg-[#181a28] px-3 py-3 text-[10px] leading-5 text-[#777989]">No additional verified options were returned for this region.</p>}</div></div>
