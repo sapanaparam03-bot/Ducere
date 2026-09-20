@@ -15,6 +15,7 @@ import {
 import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import { supabase } from '@/lib/supabase';
 import { getTitleMetadata, resolvePosterFallback } from '@/lib/title-metadata';
+import { SUBSCRIPTION_PROVIDERS } from '@/lib/providers';
 
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -599,6 +600,19 @@ function SettingsPageV3({ profile, updateProfile, resetData, upsert, catalog }: 
   return <div className="mx-auto max-w-[900px] px-5 py-9 sm:px-8 lg:px-12">
     <PageIntro eyebrow="Preferences" title="Make it yours." description="Choose your viewing room, region, and archive tools." />
     <div className="space-y-4">
+      <div className="panel rounded-2xl p-5 sm:p-7">
+        <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Streaming services</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">What you already subscribe to</h2><p className="mt-2 max-w-xl text-[11px] leading-5 text-[#77798a]">Choose the services you already pay for. Ducere will use this when presenting verified availability.</p></div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {SUBSCRIPTION_PROVIDERS.map((provider) => {
+            const selected = profile.streamingServices.includes(provider.key);
+            return <button key={provider.key} onClick={() => updateProfile({ streamingServices: selected ? profile.streamingServices.filter((key) => key !== provider.key) : [...profile.streamingServices, provider.key] })} className={`flex items-center justify-between rounded-xl border px-3 py-3 text-left transition ${selected ? 'border-[#e47a58] bg-[#e47a58]/10' : 'border-[#353747] bg-[#171925] hover:border-[#4b4d60]'}`} aria-pressed={selected} data-testid={`button-provider-pref-${provider.key}`}>
+              <span><span className="block text-xs font-bold text-[#ddd5ca]">{provider.name}</span><span className="mt-1 block text-[10px] text-[#727486]">Availability preference</span></span>
+              {selected && <Check size={15} className="text-[#e47a58]" />}
+            </button>;
+          })}
+        </div>
+        {!profile.streamingServices.length && <p className="mt-3 text-[10px] text-[#777989]">No services selected yet.</p>}
+      </div>
       <div className="panel rounded-2xl p-5 sm:p-7">
         <div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Profile</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your details</h2></div>
         <label className="mb-5 block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Name</span><input value={profile.username} onChange={(e) => updateProfile({ username: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="input-profile-name" /></label>
