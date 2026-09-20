@@ -18,7 +18,8 @@ import { getTitleMetadata, resolvePosterFallback } from '@/lib/title-metadata';
 import { SUBSCRIPTION_PROVIDERS } from '@/lib/providers';
 import { AvailabilityPanel } from '@/components/availability-panel';
 import { CalendarPage } from '@/components/calendar-page';
-import { rankRecommendations } from '@/lib/personalization';
+import { AchievementPanel } from '@/components/achievement-panel';
+import { rankRecommendations, calculateViewingMinutes } from '@/lib/personalization';
 
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -572,7 +573,11 @@ function ProfilePage({ profile, userTitles, counts, catalog }: DucereProps) {
     const perEpisode = title.type === 'anime' ? 24 : 45;
     return episodes * perEpisode;
   };
-  const estimatedHours = Math.round(userTitles.reduce((sum, item) => sum + estimateMinutes(item), 0) / 60);
+  const totalMinutes = Math.round(calculateViewingMinutes(userTitles, catalog));
+  const estimatedHours = Math.round(totalMinutes / 60);
+  const moviesWatched = watchedTitles.filter((item) => catalog.find((title) => title.id === item.titleId)?.type === 'movie').length;
+  const seriesWatched = watchedTitles.filter((item) => catalog.find((title) => title.id === item.titleId)?.type === 'tv').length;
+  const animeWatched = watchedTitles.filter((item) => catalog.find((title) => title.id === item.titleId)?.type === 'anime').length;
   const recent = userTitles.slice().sort((a, b) => (b.dateWatched ?? b.dateAdded).localeCompare(a.dateWatched ?? a.dateAdded)).slice(0, 8);
   return <div className="mx-auto max-w-[1200px] px-5 py-9 sm:px-8 lg:px-12">
     <PageIntro eyebrow="Your archive" title={`${profile.username}'s cinema.`} description="A small portrait of what you make time for." action={<Link href="/settings" className="flex items-center gap-2 rounded-lg border border-[#353646] px-3 py-2 text-[11px] font-semibold text-[#aaa8aa]" data-testid="link-profile-settings"><Settings size={14} /> Edit profile</Link>} />
@@ -586,6 +591,12 @@ function ProfilePage({ profile, userTitles, counts, catalog }: DucereProps) {
       <div className="panel rounded-2xl p-6"><SectionHeading eyebrow="Your activity" title="Recent movements" /><div className="mt-5 space-y-5">{recent.map((item, index) => { const title = catalog.find((candidate) => candidate.id === item.titleId) ?? titleById(item.titleId); if (!title) return null; return <div key={item.titleId} className="flex items-center gap-3"><div className={`flex h-8 w-8 items-center justify-center rounded-lg ${index % 2 ? 'bg-[#d5af71]/10 text-[#d5af71]' : 'bg-[#e47a58]/10 text-[#e47a58]'}`}>{item.status === 'watched' ? <Check size={15} /> : item.status === 'watching' ? <PlayCircle size={15} /> : <Bookmark size={15} />}</div><p className="text-xs text-[#aaa6a4]"><span className="font-bold text-[#dfd6ca]">{formatStatus(item.status)}</span> <Link href={`/title/${title.id}`} className="text-[#df8265] hover:underline">{title.name}</Link><span className="block mt-1 font-mono-ui text-[9px] text-[#6f7180]">{item.dateWatched ?? item.dateAdded}</span></p></div>; })}</div></div>
       <div className="panel rounded-2xl p-6"><SectionHeading eyebrow="Viewing fingerprint" title="Your favorite worlds" /><div className="mt-5 space-y-4">{topGenres.length ? topGenres.map(([genre, value]) => <div key={genre}><div className="mb-2 flex justify-between text-[11px]"><span className="text-[#b8b1ad]">{genre}</span><span className="font-mono-ui text-[#777989]">{Math.round((value / maxGenre) * 100)}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#292b3a]"><div className="h-full rounded-full bg-[#e47a58]" style={{ width: `${Math.round((value / maxGenre) * 100)}%` }} /></div></div>) : <p className="text-xs leading-6 text-[#777989]">Watch or rate a few titles and Ducere will build your viewing fingerprint here.</p>}</div></div>
     </div>
+    <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="panel-soft rounded-xl p-4"><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#df8265]">Movies</p><p className="mt-3 text-2xl font-bold text-[#eee4d5]">{moviesWatched}</p><p className="mt-1 text-[10px] text-[#777989]">completed or in progress</p></div>
+      <div className="panel-soft rounded-xl p-4"><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#df8265]">Series</p><p className="mt-3 text-2xl font-bold text-[#eee4d5]">{seriesWatched}</p><p className="mt-1 text-[10px] text-[#777989]">completed or in progress</p></div>
+      <div className="panel-soft rounded-xl p-4"><p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#df8265]">Anime</p><p className="mt-3 text-2xl font-bold text-[#eee4d5]">{animeWatched}</p><p className="mt-1 text-[10px] text-[#777989]">completed or in progress</p></div>
+    </div>
+    <div className="mt-6"><AchievementPanel userTitles={userTitles} catalog={catalog} /></div>
   </div>;
 }
 
