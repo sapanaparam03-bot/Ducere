@@ -288,11 +288,16 @@ function PosterCard({ title, userTitle, onStatus }: { title: Title; userTitle?: 
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (title.type !== 'movie' || !title.poster.startsWith('data:')) return;
+    const isCuratedSeries = title.type !== 'movie' && !title.id.startsWith('tvmaze-') && !title.id.startsWith('jikan-');
+    const needsSourceArtwork = title.type === 'movie'
+      ? title.poster.startsWith('data:')
+      : isCuratedSeries;
+    if (!needsSourceArtwork) return;
+
     const node = cardRef.current;
     if (!node) return;
     const load = () => {
-      void findWikipediaArtwork(title.name).then((source) => {
+      void resolvePosterFallback(title).then((source) => {
         if (source) setPoster(source);
       });
     };
@@ -314,6 +319,7 @@ function PosterCard({ title, userTitle, onStatus }: { title: Title; userTitle?: 
     void resolvePosterFallback(title).then((source) => {
       if (source && source !== poster) {
         setPoster(source);
+        setBroken(false);
       } else {
         setBroken(true);
       }
