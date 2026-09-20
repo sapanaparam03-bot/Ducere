@@ -19,6 +19,7 @@ import { SUBSCRIPTION_PROVIDERS, providerKeyForName } from '@/lib/providers';
 import { CalendarPage } from '@/components/calendar-page';
 import { rankRecommendations, calculateViewingMinutes } from '@/lib/personalization';
 import { AchievementPanel } from '@/components/achievement-panel';
+import { downloadDucereBackup, downloadDucereCsv, formatImportSummary, importCsvText, parseDucereBackup } from '@/lib/archive-transfer';
 
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -647,7 +648,7 @@ function ProfilePage({ profile, userTitles, counts, catalog }: DucereProps) {
   </div>;
 }
 
-function SettingsPageV3({ profile, updateProfile, resetData, upsert, catalog }: DucereProps) {
+function SettingsPageV3({ profile, updateProfile, resetData, upsert, catalog, userTitles }: DucereProps) {
   const countries = [
     ['US','United States'],['IN','India'],['CA','Canada'],['GB','United Kingdom'],
     ['AU','Australia'],['NZ','New Zealand'],['JP','Japan'],['KR','South Korea'],
