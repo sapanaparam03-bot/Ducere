@@ -10,13 +10,14 @@ import { coverArt, formatStatus, titleById, TITLES, type Title, type TitleType, 
 import {
   ArrowRight, Bookmark, Check, ChevronDown, ChevronRight, CirclePlay, Compass, Film,
   History, Home, Library, MapPin, Moon, MoreHorizontal, PlayCircle, RotateCcw, Search,
-  Settings, SlidersHorizontal, Sparkles, Star, Trash2, UserRound, CheckCircle2
+  Settings, SlidersHorizontal, Sparkles, Star, Trash2, UserRound, CheckCircle2, CalendarDays
 } from 'lucide-react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import { supabase } from '@/lib/supabase';
 import { getTitleMetadata, resolvePosterFallback } from '@/lib/title-metadata';
 import { SUBSCRIPTION_PROVIDERS } from '@/lib/providers';
 import { AvailabilityPanel } from '@/components/availability-panel';
+import { CalendarPage } from '@/components/calendar-page';
 
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -52,6 +53,7 @@ const navItems = [
   { href: '/watchlist', label: 'Watchlist', icon: Bookmark },
   { href: '/watching', label: 'Watching', icon: PlayCircle },
   { href: '/history', label: 'History', icon: History },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
 ];
 
 const typeTint: Record<TitleType, string> = {
@@ -108,6 +110,7 @@ function DucereApp() {
           <Route path="/watchlist" component={() => <CollectionPage {...shared} status="watchlist" />} />
           <Route path="/watching" component={() => <CollectionPage {...shared} status="watching" />} />
           <Route path="/history" component={() => <HistoryPage {...shared} />} />
+          <Route path="/calendar" component={() => <CalendarPage userTitles={shared.userTitles} catalog={shared.catalog} region={shared.profile.country} />} />
           <Route path="/title/:id" component={() => <TitleDetailsPage {...shared} />} />
           <Route path="/profile" component={() => <ProfilePage {...shared} />} />
           <Route path="/settings" component={() => <SettingsPageV3 {...shared} />} />
