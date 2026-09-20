@@ -6,7 +6,6 @@ export function AuthScreen() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -23,10 +22,7 @@ export function AuthScreen() {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: {
-          data: { username: username.trim() || 'Viewer' },
-          emailRedirectTo: window.location.origin,
-        },
+        options: { emailRedirectTo: window.location.origin },
       });
       if (error) {
         const message = error.message.toLowerCase();
@@ -82,10 +78,9 @@ export function AuthScreen() {
             </div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-[#df8265]">{mode === 'signin' ? 'Welcome back' : 'Start your archive'}</p>
             <h2 className="mt-2 font-display text-4xl tracking-[-.04em] text-[#f0e7da]">{mode === 'signin' ? 'Sign in to Ducere.' : 'Create your Ducere account.'}</h2>
-            <p className="mt-3 text-sm leading-6 text-[#858796]">{mode === 'signin' ? 'Your library follows your account across devices.' : 'Your watch history and queue will be stored securely in your account.'}</p>
+            <p className="mt-3 text-sm leading-6 text-[#858796]">{mode === 'signin' ? 'Your library follows your account across devices.' : 'Start with just your email and password. We’ll ask your name after you sign in.'}</p>
 
             <form onSubmit={submit} className="mt-8 space-y-4">
-              {mode === 'signup' && <label className="block"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Name</span><input required value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="name" className="h-11 w-full rounded-lg border border-[#353747] bg-[#10121d] px-3 text-sm outline-none focus:border-[#d17459]" placeholder="Viewer" /></label>}
               <label className="block"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Email</span><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="h-11 w-full rounded-lg border border-[#353747] bg-[#10121d] px-3 text-sm outline-none focus:border-[#d17459]" placeholder="you@example.com" /></label>
               <label className="block"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Password</span><input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} className="h-11 w-full rounded-lg border border-[#353747] bg-[#10121d] px-3 text-sm outline-none focus:border-[#d17459]" placeholder="At least 6 characters" /></label>
               {message && <p role="status" className="rounded-lg border border-[#4a3940] bg-[#211b25] px-3 py-2.5 text-xs leading-5 text-[#d5b9ae]">{message}</p>}
