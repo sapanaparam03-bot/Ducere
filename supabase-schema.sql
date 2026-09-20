@@ -6,6 +6,7 @@ create table if not exists public.profiles (
   username text not null default 'Viewer',
   country text not null default 'IN',
   appearance text not null default 'night' check (appearance in ('night','day')),
+  onboarding_complete boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -35,7 +36,7 @@ create policy "titles own rows" on public.user_titles for all using (auth.uid() 
 
 create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles(id, username) values (new.id, coalesce(new.raw_user_meta_data->>'username','Viewer'));
+  insert into public.profiles(id, username, onboarding_complete) values (new.id, 'Viewer', false);
   return new;
 end; $$;
 
