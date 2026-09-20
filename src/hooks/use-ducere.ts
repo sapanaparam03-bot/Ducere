@@ -70,7 +70,7 @@ export function useDucere() {
     setUserTitles(!titlesResult.error ? (titlesResult.data ?? []).map(fromDb) : []);
     setProfile(
       !profileResult.error && profileResult.data
-        ? { username: profileResult.data.username, country: profileResult.data.country, appearance: profileResult.data.appearance, onboardingComplete: Boolean(profileResult.data.onboarding_complete) }
+        ? { username: profileResult.data.username, country: profileResult.data.country, appearance: profileResult.data.appearance, onboardingComplete: Boolean(profileResult.data.onboarding_complete), streamingServices: Array.isArray(profileResult.data.streaming_services) ? profileResult.data.streaming_services : [] }
         : INITIAL_PROFILE,
     );
     setReady(true);
@@ -193,6 +193,7 @@ export function useDucere() {
           country: next.country,
           appearance: next.appearance,
           onboarding_complete: next.onboardingComplete,
+          streaming_services: next.streamingServices,
           updated_at: new Date().toISOString(),
         }).then(({ error }) => {
           if (error) {
