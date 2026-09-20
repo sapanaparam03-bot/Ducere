@@ -36,6 +36,27 @@ type AniListResponse = {
 };
 
 const metadataCache = new Map<string, Partial<Title>>();
+const STORAGE_KEY = 'ducere-title-metadata-v2';
+const STORAGE_TTL = 1000 * 60 * 60 * 24 * 7;
+
+const readStored = (key: string): Partial<Title> | null => {
+  try {
+    const raw = sessionStorage.getItem(`${STORAGE_KEY}:${key}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { savedAt: number; data: Partial<Title> };
+    return Date.now() - parsed.savedAt < STORAGE_TTL ? parsed.data : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeStored = (key: string, data: Partial<Title>) => {
+  try {
+    sessionStorage.setItem(`${STORAGE_KEY}:${key}`, JSON.stringify({ savedAt: Date.now(), data }));
+  } catch {
+    // Session storage is an optional performance cache.
+  }
+};
 
 const fetchWithTimeout = async <T,>(url: string, init?: RequestInit): Promise<T> => {
   const controller = new AbortController();
@@ -189,7 +210,7 @@ const wikipediaArtwork = async (title: string) => {
     generator: 'search',
     gsrsearch: title,
     gsrnamespace: '0',
-    gsrlimit: '1',
+    gsrlimit: '5',
     prop: 'pageimages',
     piprop: 'thumbnail',
     pithumbsize: '600',
@@ -197,10 +218,14 @@ const wikipediaArtwork = async (title: string) => {
     origin: '*',
   });
   try {
-    const json = await fetchWithTimeout<{ query?: { pages?: Record<string, { thumbnail?: { source?: string } }> } }>(
+    const json = await fetchWithTimeout<{
+      query?: { pages?: Record<string, { title?: string; thumbnail?: { source?: string } }> }
+    }>(
       `https://en.wikipedia.org/w/api.php?${params.toString()}`,
     );
-    return Object.values(json.query?.pages ?? {})[0]?.thumbnail?.source ?? null;
+    const pages = Object.values(json.query?.pages ?? {});
+    const exact = pages.find((page) => normalizeTitle(page.title ?? '') === normalizeTitle(title));
+    return exact?.thumbnail?.source ?? pages[0]?.thumbnail?.source ?? null;
   } catch {
     return null;
   }
@@ -208,8 +233,11 @@ const wikipediaArtwork = async (title: string) => {
 
 export async function resolvePosterFallback(title: Title): Promise<string | null> {
   const key = `poster:${title.id}`;
-  const cached = metadataCache.get(key);
-  if (cached?.poster) return cached.poster;
+  const cached = metadataCache.get(key) ?? readStored(key);
+  if (cached?.poster) {
+    metadataCache.set(key, cached);
+    return cached.poster;
+  }
 
   let poster: string | null = null;
   try {
@@ -226,22 +254,31 @@ export async function resolvePosterFallback(title: Title): Promise<string | null
   }
 
   if (!poster) poster = await wikipediaArtwork(title.name);
-  metadataCache.set(key, poster ? { poster } : {});
+  const data = poster ? { poster } : {};
+  metadataCache.set(key, data);
+  if (poster) writeStored(key, data);
   return poster;
 }
 
 export async function getTitleMetadata(title: Title): Promise<Partial<Title>> {
   const key = `meta:${title.id}`;
-  const cached = metadataCache.get(key);
-  if (cached) return cached;
+  const cached = metadataCache.get(key) ?? readStored(key);
+  if (cached) {
+    metadataCache.set(key, cached);
+    return cached;
+  }
 
   try {
     const result = title.type === 'tv'
       ? await tvMazeSeasons(title)
       : title.type === 'anime'
         ? await aniListMetadata(title)
-        : {};
+        : await (async () => {
+            const poster = await wikipediaArtwork(title.name);
+            return poster ? { poster, backdrop: poster } : {};
+          })();
     metadataCache.set(key, result);
+    writeStored(key, result);
     return result;
   } catch {
     return {};
