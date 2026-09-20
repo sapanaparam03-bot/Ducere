@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { getTitleMetadata, resolvePosterFallback } from '@/lib/title-metadata';
 import { SUBSCRIPTION_PROVIDERS, providerKeyForName } from '@/lib/providers';
 import { CalendarPage } from '@/components/calendar-page';
+import { LegalPage } from '@/components/legal-page';
 import { rankRecommendations, calculateViewingMinutes } from '@/lib/personalization';
 import { AchievementPanel } from '@/components/achievement-panel';
 import { downloadDucereBackup, downloadDucereCsv, formatImportSummary, importCsvText, parseDucereBackup } from '@/lib/archive-transfer';
@@ -116,6 +117,9 @@ function DucereApp() {
           <Route path="/title/:id" component={() => <TitleDetailsPage {...shared} />} />
           <Route path="/profile" component={() => <ProfilePage {...shared} />} />
           <Route path="/settings" component={() => <SettingsPageV3 {...shared} />} />
+          <Route path="/privacy" component={() => <LegalPage kind="privacy" />} />
+          <Route path="/terms" component={() => <LegalPage kind="terms" />} />
+          <Route path="/about" component={() => <LegalPage kind="about" />} />
           <Route component={NotFound} />
         </Switch>
       </main>
@@ -648,7 +652,7 @@ function ProfilePage({ profile, userTitles, counts, catalog }: DucereProps) {
   </div>;
 }
 
-function SettingsPageV3({ profile, updateProfile, resetData, upsert, catalog, userTitles }: DucereProps) {
+function SettingsPageV3({ profile, updateProfile, resetData, deleteAccount, upsert, catalog, userTitles }: DucereProps) {
   const countries = [
     ['US','United States'],['IN','India'],['CA','Canada'],['GB','United Kingdom'],
     ['AU','Australia'],['NZ','New Zealand'],['JP','Japan'],['KR','South Korea'],
@@ -691,6 +695,20 @@ function SettingsPageV3({ profile, updateProfile, resetData, upsert, catalog, us
       <div className="panel rounded-2xl p-5 sm:p-7">
         <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Data</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your archive, your rules</h2></div>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p className="text-xs font-semibold text-[#c1b9b5]">Reset archive</p><p className="mt-1 text-[10px] text-[#747687]">Remove your saved titles and restore the default profile.</p></div><button onClick={() => { if (window.confirm('Reset your archive?')) resetData(); }} className="flex items-center gap-2 self-start rounded-lg border border-[#633e42] px-3 py-2 text-[11px] font-semibold text-[#df8178] hover:bg-[#633e42]/20" data-testid="button-reset-data"><RotateCcw size={14} /> Reset data</button></div>
+        <div className="mt-6 border-t hairline pt-6">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div><p className="text-xs font-semibold text-[#c1b9b5]">Delete account</p><p className="mt-1 max-w-xl text-[10px] leading-5 text-[#747687]">Permanently delete your Ducere account and its stored profile/library data. Export your archive first if you want to keep a copy.</p></div>
+            <button onClick={async () => { if (!window.confirm('Delete your Ducere account permanently? This cannot be undone.')) return; try { await deleteAccount(); } catch (error) { window.alert(error instanceof Error ? error.message : 'Account deletion failed.'); } }} className="flex items-center gap-2 self-start rounded-lg border border-[#633e42] px-3 py-2 text-[11px] font-semibold text-[#df8178] hover:bg-[#633e42]/20" data-testid="button-delete-account"><Trash2 size={14} /> Delete account</button>
+          </div>
+        </div>
+      </div>
+      <div className="panel rounded-2xl p-5 sm:p-7">
+        <div className="mb-4"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Legal & credits</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Know what powers Ducere</h2></div>
+        <div className="flex flex-wrap gap-3 text-xs font-semibold">
+          <Link href="/privacy" className="text-[#bd8a78] hover:text-[#eda07f]">Privacy Policy</Link>
+          <Link href="/terms" className="text-[#bd8a78] hover:text-[#eda07f]">Terms of Service</Link>
+          <Link href="/about" className="text-[#bd8a78] hover:text-[#eda07f]">About & Credits</Link>
+        </div>
       </div>
     </div>
   </div>;
