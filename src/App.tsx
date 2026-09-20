@@ -89,7 +89,7 @@ function DucereApp() {
     return <AuthScreen />;
   }
 
-  if (ducere.profile.username === 'Viewer') {
+  if (!ducere.profile.onboardingComplete) {
     return <ProfileSetup profile={ducere.profile} onSave={ducere.updateProfile} />;
   }
 
@@ -124,7 +124,7 @@ function ProfileSetup({ profile, onSave }: { profile: DucereProps['profile']; on
     const value = name.trim();
     if (!value) return;
     setBusy(true);
-    onSave({ username: value });
+    onSave({ username: value, onboardingComplete: true });
     window.setTimeout(() => setBusy(false), 250);
   };
 
