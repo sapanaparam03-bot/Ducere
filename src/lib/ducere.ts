@@ -21,10 +21,10 @@ export const coverArt = (label: string, type: TitleType) => {
   const safeLabel = escapeSvgText(label.slice(0, 28));
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 1100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${palette[0]}"/><stop offset="1" stop-color="#15182a"/></linearGradient></defs><rect width="780" height="1100" fill="url(#g)"/><circle cx="640" cy="170" r="180" fill="${palette[1]}" opacity=".22"/><path d="M0 920C220 760 420 1010 780 820V1100H0Z" fill="#0d101b" opacity=".72"/><text x="58" y="925" fill="#f2e9d9" font-family="Georgia,serif" font-size="54">${safeLabel}</text><text x="60" y="982" fill="${palette[1]}" font-family="monospace" font-size="18" letter-spacing="4">DUCERE CATALOG</text></svg>`)}`;
 };
-const posterUrl = (path: string) => path.startsWith('http') ? path : `https://image.tmdb.org/t/p/w500${path}`;
-const backdropUrl = (path: string) => path.startsWith('http') ? path : `https://image.tmdb.org/t/p/w1280${path}`;
-const img = (path: string) => posterUrl(path);
-const back = (path: string) => backdropUrl(path);
+const posterUrl = (path: string) => path.startsWith('http') ? path : coverArt('Ducere', 'movie');
+const backdropUrl = (path: string) => path.startsWith('http') ? path : coverArt('Ducere', 'movie');
+const img = (_path: string) => coverArt('Ducere', 'movie');
+const back = (_path: string) => coverArt('Ducere', 'movie');
 
 const curatedTitle = (
   id: string,
@@ -44,8 +44,8 @@ const curatedTitle = (
   id,
   name,
   type,
-  poster: posterUrl(posterPath),
-  backdrop: posterUrl(posterPath),
+  poster: coverArt(name, type),
+  backdrop: coverArt(name, type),
   releaseYear,
   genres,
   rating,
