@@ -44,7 +44,7 @@ type JikanAnime = {
 };
 
 
-const CACHE_KEY = 'ducere-live-catalog-v6';
+const CACHE_KEY = 'ducere-live-catalog-v7';
 const CACHE_TTL = 1000 * 60 * 60 * 24;
 
 const stripMarkup = (value: string | null | undefined) =>
@@ -161,7 +161,7 @@ const fetchAnimePage = async (page: number) => {
 
 const fetchAnimePages = async () => {
   const pages: JikanAnime[] = [];
-  for (let page = 1; page <= 6; page++) {
+  for (let page = 1; page <= 8; page++) {
     if (page > 1) await new Promise((resolve) => window.setTimeout(resolve, 350));
     pages.push(...await fetchAnimePage(page));
   }
@@ -205,16 +205,16 @@ export async function loadLiveCatalog(): Promise<Title[]> {
 
   const [tvResult, animeResult, movieResult] = await Promise.allSettled([
     Promise.all(
-      Array.from({ length: 8 }, (_, page) =>
+      Array.from({ length: 10 }, (_, page) =>
         fetchJson<TvMazeShow[]>(`https://api.tvmaze.com/shows?page=${page}`),
       ),
     ),
     fetchAnimePages(),
     Promise.all([
-      wikipediaCategory('1990s films', 3),
-      wikipediaCategory('2000s films', 3),
-      wikipediaCategory('2010s films', 3),
-      wikipediaCategory('2020s films', 3),
+      wikipediaCategory('1990s films', 4),
+      wikipediaCategory('2000s films', 4),
+      wikipediaCategory('2010s films', 4),
+      wikipediaCategory('2020s films', 4),
     ]),
   ]);
 
@@ -228,10 +228,22 @@ export async function loadLiveCatalog(): Promise<Title[]> {
     ...moviePages.flat(),
   ];
 
-  const seen = new Set<string>();
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const seenIds = new Set<string>();
+  const seenCanonical = new Set<string>();
   const merged = [...TITLES, ...remoteTitles].filter((title) => {
-    if (seen.has(title.id)) return false;
-    seen.add(title.id);
+    if (seenIds.has(title.id)) return false;
+    seenIds.add(title.id);
+
+    const name = normalize(title.name);
+    const canonical = `${title.type}:${name}:${title.releaseYear || 'unknown'}`;
+    const fallbackCanonical = `${title.type}:${name}`;
+    const duplicate = seenCanonical.has(canonical) ||
+      (title.releaseYear === 0 && seenCanonical.has(fallbackCanonical));
+
+    if (duplicate) return false;
+    seenCanonical.add(canonical);
+    if (title.releaseYear === 0) seenCanonical.add(fallbackCanonical);
     return true;
   });
   writeCache(merged);
