@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { INITIAL_PROFILE, type Profile, type UserStatus, type UserTitle } from '@/lib/ducere';
 import { supabase } from '@/lib/supabase';
 
@@ -45,6 +45,7 @@ export function useDucere() {
   const [ready, setReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
+  const saveTimers = useRef(new Map<string, ReturnType<typeof window.setTimeout>>());
 
   const loadSessionData = useCallback(async (uid: string | null) => {
     setUserId(uid);
@@ -105,14 +106,29 @@ export function useDucere() {
   }, [userId, profile]);
 
   const persist = useCallback(async (item: UserTitle) => {
-    if (userId && supabase) {
-      const { error } = await supabase.from('user_titles').upsert(toDb(userId, item), { onConflict: 'user_id,title_id' });
-      if (error) {
-        console.error('Ducere: failed to save title', error);
-        setDataError('Some changes could not be saved. Please retry.');
-      }
+    if (!userId || !supabase) return;
+    const { error } = await supabase.from('user_titles').upsert(toDb(userId, item), { onConflict: 'user_id,title_id' });
+    if (error) {
+      console.error('Ducere: failed to save title', error);
+      setDataError('Some changes could not be saved. Please retry.');
     }
   }, [userId]);
+
+  const schedulePersist = useCallback((item: UserTitle, delay = 450) => {
+    if (!userId || !supabase) return;
+    const previous = saveTimers.current.get(item.titleId);
+    if (previous) window.clearTimeout(previous);
+    const timer = window.setTimeout(() => {
+      saveTimers.current.delete(item.titleId);
+      void persist(item);
+    }, delay);
+    saveTimers.current.set(item.titleId, timer);
+  }, [persist, userId]);
+
+  useEffect(() => () => {
+    saveTimers.current.forEach((timer) => window.clearTimeout(timer));
+    saveTimers.current.clear();
+  }, []);
 
   const getUserTitle = useCallback((id: string) => userTitles.find((item) => item.titleId === id), [userTitles]);
 
@@ -122,10 +138,10 @@ export function useDucere() {
       const next: UserTitle = found
         ? { ...found, ...patch }
         : { titleId, status: patch.status ?? 'watchlist', dateAdded: new Date().toISOString().slice(0, 10), ...patch } as UserTitle;
-      void persist(next);
+      schedulePersist(next);
       return found ? current.map((item) => item.titleId === titleId ? next : item) : [...current, next];
     });
-  }, [persist]);
+  }, [schedulePersist]);
 
   const remove = useCallback((titleId: string) => {
     setUserTitles((current) => current.filter((item) => item.titleId !== titleId));
@@ -156,13 +172,14 @@ export function useDucere() {
     upsert(titleId, { progress: safeProgress, ...(safeProgress >= 100 ? { status: 'watched', dateWatched: new Date().toISOString().slice(0, 10) } : { status: 'watching' }) });
   }, [upsert]);
 
-  const setEpisodeProgress = useCallback((titleId: string, season: number, episode: number) => {
+  const setEpisodeProgress = useCallback((titleId: string, season: number, episode: number, progress?: number) => {
     const safeSeason = Math.max(1, Math.floor(season));
     const safeEpisode = Math.max(1, Math.floor(episode));
     upsert(titleId, {
       status: 'watching',
       currentSeason: safeSeason,
       currentEpisode: safeEpisode,
+      ...(typeof progress === 'number' ? { progress: Math.max(0, Math.min(100, Math.round(progress))) } : {}),
     });
   }, [upsert]);
 
