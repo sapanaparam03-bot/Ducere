@@ -3,6 +3,7 @@ import type { Title } from './ducere';
 type TvMazeSearchResult = {
   show?: {
     id: number;
+    name?: string;
     image?: { original?: string | null; medium?: string | null } | null;
   };
 };
@@ -48,10 +49,18 @@ const fetchWithTimeout = async <T,>(url: string, init?: RequestInit): Promise<T>
   }
 };
 
+const normalizeTitle = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
 const tvMazeImage = async (title: Title) => {
   const query = encodeURIComponent(title.name);
   const results = await fetchWithTimeout<TvMazeSearchResult[]>(`https://api.tvmaze.com/search/shows?q=${query}`);
-  return results[0]?.show?.image?.original ?? results[0]?.show?.image?.medium ?? null;
+  const exact = results.find((entry) => normalizeTitle(entry.show?.name ?? '') === normalizeTitle(title.name));
+  return exact?.show?.image?.original ??
+    exact?.show?.image?.medium ??
+    results[0]?.show?.image?.original ??
+    results[0]?.show?.image?.medium ??
+    null;
 };
 
 const tvMazeSeasons = async (title: Title) => {
@@ -63,7 +72,9 @@ const tvMazeSeasons = async (title: Title) => {
 
   const seasons = await fetchWithTimeout<TvMazeSeason[]>(`https://api.tvmaze.com/shows/${showId}/seasons`);
   const valid = seasons.filter((season) => Number.isFinite(season.number ?? NaN));
+  const poster = await tvMazeImage(title).catch(() => null);
   return {
+    ...(poster ? { poster, backdrop: poster } : {}),
     seasons: valid.length || title.seasons || 1,
     episodes: title.episodes || valid.reduce((sum, season) => sum + (season.episodeOrder ?? 0), 0) || 0,
   };
@@ -71,8 +82,8 @@ const tvMazeSeasons = async (title: Title) => {
 
 const aniListMedia = async (title: Title) => {
   const idMal = title.id.match(/^jikan-(\d+)$/)?.[1];
-  const query = `query ($idMal: Int, $search: String) {
-    Media(idMal: $idMal, search: $search, type: ANIME) {
+  const query = `query ($id: Int, $idMal: Int, $search: String) {
+    Media(id: $id, idMal: $idMal, search: $search, type: ANIME) {
       id
       episodes
       coverImage { extraLarge large }
@@ -89,9 +100,14 @@ const aniListMedia = async (title: Title) => {
       }
     }
   }`;
+  const aliases: Record<string, string> = {
+    'demon slayer': 'Kimetsu no Yaiba',
+    'demon-slayer': 'Kimetsu no Yaiba',
+  };
+  const search = aliases[normalizeTitle(title.name)] ?? title.name;
   const body = {
     query,
-    variables: idMal ? { idMal: Number(idMal) } : { search: title.name },
+    variables: idMal ? { idMal: Number(idMal) } : { search },
   };
   return fetchWithTimeout<AniListResponse>('https://graphql.anilist.co', {
     method: 'POST',
@@ -105,26 +121,65 @@ const aniListMetadata = async (title: Title) => {
   const media = result.data?.Media;
   if (!media) return {};
 
-  const linkedSeries = (media.relations?.edges ?? []).filter(
+  const directTvRelations = (media.relations?.edges ?? []).filter(
     (edge) => (edge.relationType === 'SEQUEL' || edge.relationType === 'PREQUEL') &&
       (edge.node?.format === 'TV' || edge.node?.format === 'TV_SHORT'),
   );
 
+  const connectedIds = new Set<number>();
+  for (const edge of directTvRelations) {
+    if (edge.node?.id) connectedIds.add(edge.node.id);
+  }
+
+  // Anime seasons are commonly represented by separate TV entries linked by
+  // prequel/sequel relations. Walk the sequel chain a few steps so titles such
+  // as Demon Slayer can reflect multiple TV seasons without loading this at startup.
+  let currentId = directTvRelations.find((edge) => edge.relationType === 'SEQUEL')?.node?.id;
+  for (let depth = 0; currentId && depth < 10; depth++) {
+    const linked = await fetchWithTimeout<AniListResponse>(`https://graphql.anilist.co`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        query: `query ($id: Int) {
+          Media(id: $id, type: ANIME) {
+            id
+            relations {
+              edges {
+                relationType
+                node {
+                  id
+                  format
+                  title { romaji english }
+                }
+              }
+            }
+          }
+        }`,
+        variables: { id: currentId },
+      }),
+    }).catch(() => null);
+    const next = linked?.data?.Media?.relations?.edges?.find(
+      (edge) => edge.relationType === 'SEQUEL' &&
+        (edge.node?.format === 'TV' || edge.node?.format === 'TV_SHORT') &&
+        edge.node?.id,
+    )?.node?.id;
+    if (!next || connectedIds.has(next)) break;
+    connectedIds.add(next);
+    currentId = next;
+  }
+
   const poster =
     media.coverImage?.extraLarge ??
     media.coverImage?.large ??
-    linkedSeries.map((edge) => edge.node?.coverImage?.extraLarge ?? edge.node?.coverImage?.large).find(Boolean) ??
+    directTvRelations.map((edge) => edge.node?.coverImage?.extraLarge ?? edge.node?.coverImage?.large).find(Boolean) ??
     null;
 
-  // AniList represents many anime seasons as separate TV entries linked as
-  // prequels/sequels. This is a best-effort franchise count; curated titles
-  // retain their explicit season data.
-  const inferredSeasons = Math.max(1, 1 + linkedSeries.length);
+  const inferredSeasons = Math.max(1, connectedIds.size + 1);
 
   return {
     ...(poster ? { poster, backdrop: poster } : {}),
     ...(media.episodes ? { episodes: media.episodes } : {}),
-    seasons: title.seasons && title.seasons > 1 ? title.seasons : inferredSeasons,
+    seasons: title.seasons && title.seasons > 1 ? Math.max(title.seasons, inferredSeasons) : inferredSeasons,
   };
 };
 
