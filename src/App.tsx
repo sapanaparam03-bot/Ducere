@@ -504,7 +504,7 @@ function TitleDetailsPage(props: DucereProps) {
   useEffect(() => {
     let active = true;
     setEnrichedTitle(null);
-    if (!title || title.type === 'movie') return () => { active = false; };
+    if (!title) return () => { active = false; };
     void getTitleMetadata(title).then((metadata) => {
       if (active && Object.keys(metadata).length) setEnrichedTitle({ ...title, ...metadata });
     });
@@ -617,7 +617,7 @@ function SettingsPageV3({ profile, updateProfile, resetData, upsert, catalog }: 
       <div className="panel rounded-2xl p-5 sm:p-7">
         <div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Profile</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your details</h2></div>
         <label className="mb-5 block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Name</span><input value={profile.username} onChange={(e) => updateProfile({ username: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="input-profile-name" /></label>
-        <label className="block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Country or region</span><select value={profile.country} onChange={(e) => updateProfile({ country: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="select-profile-country">{countries.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select><span className="mt-2 block text-[10px] leading-5 text-[#747687]">Ducere stores the selected region for future verified availability services.</span></label>
+        <label className="block max-w-md"><span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Country or region</span><select value={profile.country} onChange={(e) => updateProfile({ country: e.target.value })} className="h-11 w-full rounded-lg border border-[#353747] bg-[#171925] px-3 text-sm text-[#e3d8ca] outline-none focus:border-[#d17459]" data-testid="select-profile-country">{countries.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select><span className="mt-2 block text-[10px] leading-5 text-[#747687]">Ducere uses this region for verified availability checks.</span></label>
       </div>
       <div className="panel rounded-2xl p-5 sm:p-7">
         <div className="mb-6"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Appearance</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your viewing room</h2></div>
