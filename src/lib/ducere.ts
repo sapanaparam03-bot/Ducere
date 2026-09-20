@@ -13,7 +13,7 @@ export type UserTitle = {
   titleId: string; status: UserStatus; dateAdded: string; dateWatched?: string;
   rating?: number; review?: string; currentSeason?: number; currentEpisode?: number; progress?: number;
 };
-export type Profile = { username: string; country: string; appearance: 'night' | 'day'; onboardingComplete: boolean; };
+export type Profile = { username: string; country: string; appearance: 'night' | 'day'; onboardingComplete: boolean; streamingServices: string[]; };
 
 const escapeSvgText = (value: string) => value.replace(/[<>&'"]/g, (character) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '\'': '&apos;', '"': '&quot;' })[character] ?? character);
 export const coverArt = (label: string, type: TitleType) => {
@@ -150,6 +150,6 @@ export const INITIAL_USER_TITLES: UserTitle[] = [
   { titleId: 'the-last-of-us', status: 'watchlist', dateAdded: '2024-10-10' },
 ];
 
-export const INITIAL_PROFILE: Profile = { username: 'Viewer', country: 'IN', appearance: 'night', onboardingComplete: false };
+export const INITIAL_PROFILE: Profile = { username: 'Viewer', country: 'IN', appearance: 'night', onboardingComplete: false, streamingServices: [] };
 export const titleById = (id: string) => TITLES.find((title) => title.id === id);
 export const formatStatus = (status: UserStatus | string | undefined) => status === 'watchlist' ? 'Want to watch' : status === 'watching' ? 'Watching' : 'Watched';
