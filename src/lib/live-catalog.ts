@@ -28,7 +28,7 @@ type JikanAnime = {
 
 
 const CACHE_KEY = 'ducere-live-catalog-v4';
-const CACHE_TTL = 1000 * 60 * 60 * 12;
+const CACHE_TTL = 1000 * 60 * 60 * 24;
 
 const stripMarkup = (value: string | null | undefined) =>
   (value ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
@@ -99,9 +99,15 @@ const writeCache = (titles: Title[]) => {
 };
 
 const fetchJson = async <T,>(url: string): Promise<T> => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Catalog source returned ${response.status}`);
-  return response.json() as Promise<T>;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 7000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`Catalog source returned ${response.status}`);
+    return response.json() as Promise<T>;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 };
 
 export async function loadLiveCatalog(): Promise<Title[]> {
@@ -110,11 +116,11 @@ export async function loadLiveCatalog(): Promise<Title[]> {
 
   const [tvResult, animeResult] = await Promise.allSettled([
     Promise.all(
-      Array.from({ length: 8 }, (_, page) =>
+      Array.from({ length: 3 }, (_, page) =>
         fetchJson<TvMazeShow[]>(`https://api.tvmaze.com/shows?page=${page}`),
       ),
     ),
-    fetchJson<{ data?: JikanAnime[] }>('https://api.jikan.moe/v4/top/anime?limit=50'),
+    fetchJson<{ data?: JikanAnime[] }>('https://api.jikan.moe/v4/top/anime?limit=30'),
   ]);
 
   const tvPages = tvResult.status === 'fulfilled' ? tvResult.value : [];
