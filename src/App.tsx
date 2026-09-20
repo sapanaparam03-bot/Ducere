@@ -89,6 +89,10 @@ function DucereApp() {
     return <AuthScreen />;
   }
 
+  if (ducere.profile.username === 'Viewer') {
+    return <ProfileSetup profile={ducere.profile} onSave={ducere.updateProfile} />;
+  }
+
   const shared = { ...ducere, catalog: liveCatalog.titles, catalogLoading: liveCatalog.loading, catalogError: liveCatalog.error };
   return (
     <div className="film-grain app-shell min-h-[100dvh]">
@@ -109,6 +113,39 @@ function DucereApp() {
       </main>
     </div>
   );
+}
+
+function ProfileSetup({ profile, onSave }: { profile: DucereProps['profile']; onSave: (patch: Partial<DucereProps['profile']>) => void }) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = name.trim();
+    if (!value) return;
+    setBusy(true);
+    onSave({ username: value });
+    window.setTimeout(() => setBusy(false), 250);
+  };
+
+  return <div className="film-grain flex min-h-[100dvh] items-center justify-center bg-[#0d0f18] px-5 py-10 text-[#e9e1d6]">
+    <div className="w-full max-w-lg rounded-[22px] border border-[#2d3040] bg-[#151722] p-7 shadow-2xl sm:p-10">
+      <div className="mb-8 flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e47a58] text-[#17151f]"><Film size={19} /></span>
+        <span className="font-display text-2xl">ducere</span>
+      </div>
+      <p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-[#df8265]">One small detail</p>
+      <h1 className="mt-2 font-display text-4xl tracking-[-.04em] text-[#f0e7da]">What should we call you?</h1>
+      <p className="mt-3 text-sm leading-6 text-[#858796]">Your name will appear across your private cinema. You can change it later in Settings.</p>
+      <form onSubmit={submit} className="mt-8 space-y-4">
+        <label className="block">
+          <span className="mb-2 block text-xs font-semibold text-[#c1b9b5]">Name</span>
+          <input required autoFocus value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" className="h-12 w-full rounded-lg border border-[#353747] bg-[#10121d] px-3 text-sm outline-none focus:border-[#d17459]" placeholder="Your name" />
+        </label>
+        <button disabled={busy || !name.trim()} className="flex h-12 w-full items-center justify-center rounded-lg bg-[#e47a58] text-xs font-bold text-[#211923] disabled:cursor-not-allowed disabled:opacity-60">{busy ? 'Saving…' : 'Continue to Ducere'}</button>
+      </form>
+    </div>
+  </div>;
 }
 
 function Shell({ profileName, counts, onSignOut }: { profileName: string; counts: { watchlist: number; watching: number }; onSignOut: () => void }) {
