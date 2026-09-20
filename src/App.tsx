@@ -10,7 +10,7 @@ import { coverArt, formatStatus, titleById, TITLES, type Title, type TitleType, 
 import {
   ArrowRight, Bookmark, Check, ChevronDown, ChevronRight, CirclePlay, Compass, Film,
   History, Home, Library, MapPin, Moon, MoreHorizontal, PlayCircle, RotateCcw, Search,
-  Settings, SlidersHorizontal, Sparkles, Star, Trash2, UserRound, CheckCircle2, CalendarDays
+  Settings, SlidersHorizontal, Sparkles, Star, Trash2, UserRound, CheckCircle2, Download, Upload, CalendarDays
 } from 'lucide-react';
 import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import { supabase } from '@/lib/supabase';
@@ -685,7 +685,7 @@ function SettingsPageV3({ profile, updateProfile, resetData, upsert, catalog }: 
       </div>
       <div className="panel rounded-2xl p-5 sm:p-7">
         <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Import</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Bring your archive with you</h2></div>
-        <ImportPanel catalog={catalog} upsert={upsert} />
+        <ImportPanel catalog={catalog} upsert={upsert} profile={profile} userTitles={userTitles} updateProfile={updateProfile} />
       </div>
       <div className="panel rounded-2xl p-5 sm:p-7">
         <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Data</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Your archive, your rules</h2></div>
@@ -694,23 +694,75 @@ function SettingsPageV3({ profile, updateProfile, resetData, upsert, catalog }: 
     </div>
   </div>;
 }
-function ImportPanel({ catalog, upsert }: { catalog: Title[]; upsert: DucereProps['upsert'] }) {
+function ImportPanel({ catalog, upsert, profile, userTitles, updateProfile }: { catalog: Title[]; upsert: DucereProps['upsert']; profile: DucereProps['profile']; userTitles: DucereProps['userTitles']; updateProfile: DucereProps['updateProfile'] }) {
   const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
   const handleFile = async (file: File) => {
+    setBusy(true);
+    setMessage('');
     try {
-      const rows = parseCsv(await file.text());
-      const imported = importRows(rows, catalog);
-      imported.forEach((item) => upsert(item.titleId, item));
-      setMessage(imported.length ? `Imported ${imported.length} matching title${imported.length === 1 ? '' : 's'}.` : 'No catalogue matches were found in this file.');
-    } catch { setMessage('Could not read this CSV file.'); }
+      const text = await file.text();
+      if (file.name.toLowerCase().endsWith('.json')) {
+        const backup = parseDucereBackup(text);
+        const known = new Set(catalog.map((title) => title.id));
+        let imported = 0;
+        let skipped = 0;
+        backup.titles.forEach((item) => {
+          if (!known.has(item.titleId)) {
+            skipped += 1;
+            return;
+          }
+          upsert(item.titleId, item);
+          imported += 1;
+        });
+        updateProfile({
+          username: backup.profile.username,
+          country: backup.profile.country,
+          appearance: backup.profile.appearance,
+          streamingServices: backup.profile.streamingServices,
+          onboardingComplete: true,
+        });
+        setMessage(`Backup restored: ${imported} titles imported, ${skipped} titles skipped because they are not currently in the catalogue.`);
+      } else {
+        const { items, rows } = importCsvText(text, catalog);
+        const ids = new Set(userTitles.map((item) => item.titleId));
+        let imported = 0;
+        let skipped = 0;
+        items.forEach((item) => {
+          if (ids.has(item.titleId)) {
+            skipped += 1;
+            return;
+          }
+          upsert(item.titleId, item);
+          imported += 1;
+        });
+        const invalid = Math.max(0, rows - items.length);
+        setMessage(formatImportSummary({ imported, skipped, invalid }));
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not read this file.');
+    } finally {
+      setBusy(false);
+    }
   };
+
   return <div className="panel rounded-2xl p-5 sm:p-7">
-    <div className="mb-5"><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Import</p><h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Bring your archive with you</h2><p className="mt-2 max-w-xl text-[11px] leading-5 text-[#77798a]">Import CSV exports from IMDb, Letterboxd, or MyAnimeList. Ducere matches titles it recognizes and leaves unmatched rows untouched.</p></div>
-    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#e47a58] px-4 py-2.5 text-xs font-bold text-[#211923]"><span>Choose CSV</span><input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFile(file); e.currentTarget.value = ''; }} data-testid="input-import-csv" /></label>
-    {message && <p className="mt-3 text-[11px] text-[#87bd9d]" data-testid="text-import-result">{message}</p>}
+    <div className="mb-5">
+      <p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">Archive transfer</p>
+      <h2 className="mt-1 text-lg font-bold text-[#e9e0d3]">Bring your archive with you</h2>
+      <p className="mt-2 max-w-xl text-[11px] leading-5 text-[#77798a]">Import CSV exports from IMDb, Letterboxd, or MyAnimeList, or restore a full Ducere JSON backup. Unknown titles are reported instead of silently discarded.</p>
+    </div>
+    <div className="flex flex-wrap gap-2">
+      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#e47a58] px-4 py-2.5 text-xs font-bold text-[#211923]">
+        <Upload size={14} /> <span>{busy ? 'Reading…' : 'Import CSV / JSON'}</span>
+        <input type="file" accept=".csv,.json,text/csv,application/json" className="hidden" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFile(file); e.currentTarget.value = ''; }} data-testid="input-import-archive" />
+      </label>
+      <button onClick={() => downloadDucereBackup(profile, userTitles)} className="inline-flex items-center gap-2 rounded-lg border border-[#414355] px-4 py-2.5 text-xs font-bold text-[#aaa7ad] hover:border-[#d17459] hover:text-[#e47a58]" data-testid="button-export-backup"><Download size={14} /> Export Ducere backup</button>
+    </div>
+    {message && <p className="mt-3 text-[11px] leading-5 text-[#87bd9d]" data-testid="text-import-result">{message}</p>}
   </div>;
 }
-
 function SettingSwitch({ label, copy, value, onChange, testId }: { label: string; copy: string; value: boolean; onChange: (value: boolean) => void; testId: string }) {
   return <div className="flex items-center justify-between gap-4 py-4"><div><p className="text-xs font-semibold text-[#c9c0ba]">{label}</p><p className="mt-1 text-[10px] leading-5 text-[#77798a]">{copy}</p></div><button onClick={() => onChange(!value)} className={`relative h-6 w-11 shrink-0 rounded-full transition ${value ? 'bg-[#e47a58]' : 'bg-[#3b3d4d]'}`} role="switch" aria-checked={value} data-testid={testId}><span className={`absolute top-1 h-4 w-4 rounded-full bg-[#f5ebdb] transition-transform ${value ? 'translate-x-6' : 'translate-x-1'}`} /></button></div>;
 }
