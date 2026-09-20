@@ -416,7 +416,7 @@ function ContinueCard({ title, item, onFinish, onProgress, onEpisodeProgress }: 
 }
 
 function StatTile({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
-  return <div className="panel-soft rounded-xl px-4 py-4"><div className="mb-4 flex items-center justify-between text-[#df8265]">{icon}<span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#6f7181]">2024</span></div><p className="text-2xl font-bold tracking-[-.04em] text-[#eee4d5]">{value}</p><p className="mt-1 text-[11px] text-[#898b99]">{label}</p></div>;
+  return <div className="panel-soft rounded-xl px-4 py-4"><div className="mb-4 flex items-center justify-between text-[#df8265]">{icon}<span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#6f7181]">{new Date().getFullYear()}</span></div><p className="text-2xl font-bold tracking-[-.04em] text-[#eee4d5]">{value}</p><p className="mt-1 text-[11px] text-[#898b99]">{label}</p></div>;
 }
 
 function EmptyState({ icon, title, copy, href, action }: { icon: ReactNode; title: string; copy: string; href: string; action: string }) {
