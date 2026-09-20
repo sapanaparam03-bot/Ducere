@@ -69,7 +69,7 @@ export function useDucere() {
     setUserTitles(!titlesResult.error ? (titlesResult.data ?? []).map(fromDb) : []);
     setProfile(
       !profileResult.error && profileResult.data
-        ? { username: profileResult.data.username, country: profileResult.data.country, appearance: profileResult.data.appearance }
+        ? { username: profileResult.data.username, country: profileResult.data.country, appearance: profileResult.data.appearance, onboardingComplete: Boolean(profileResult.data.onboarding_complete) }
         : INITIAL_PROFILE,
     );
     setReady(true);
@@ -175,6 +175,7 @@ export function useDucere() {
           username: next.username,
           country: next.country,
           appearance: next.appearance,
+          onboarding_complete: next.onboardingComplete,
           updated_at: new Date().toISOString(),
         }).then(({ error }) => {
           if (error) {
