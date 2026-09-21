@@ -45,7 +45,7 @@ export function useDucere() {
   const [ready, setReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
-  const saveTimers = useRef(new Map<string, ReturnType<typeof window.setTimeout>>());
+  const saveTimers = useRef(new Map<string, number>());
 
   const loadSessionData = useCallback(async (uid: string | null) => {
     setUserId(uid);
