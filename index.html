@@ -6,6 +6,7 @@
     <title>Ducere</title>
     <meta name="description" content="Ducere — track what you watch, what you want to watch, and where you can watch it." />
     <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0d0f18" />
     <meta property="og:title" content="Ducere" />
     <meta property="og:description" content="Ducere — track what you watch, what you want to watch, and where you can watch it." />
     <meta property="og:type" content="website" />
@@ -13,6 +14,18 @@
     <meta name="twitter:title" content="Ducere" />
     <meta name="twitter:description" content="Ducere — track what you watch, what you want to watch, and where you can watch it." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/ducere-mark.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <style>
+      /* Use the official Ducere mark in the production navigation without changing layout. */
+      a[data-testid="link-brand"] > span:first-child,
+      header > div:first-child > span:first-child {
+        background: url('/ducere-mark.svg') center / cover no-repeat !important;
+        color: transparent !important;
+      }
+      a[data-testid="link-brand"] > span:first-child svg,
+      header > div:first-child > span:first-child svg { display: none !important; }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
