@@ -45,7 +45,7 @@ export function useDucere() {
   const [ready, setReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
-  const saveTimers = useRef(new Map<string, number>());
+  const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const loadSessionData = useCallback(async (uid: string | null) => {
     setUserId(uid);
@@ -117,8 +117,8 @@ export function useDucere() {
   const schedulePersist = useCallback((item: UserTitle, delay = 450) => {
     if (!userId || !supabase) return;
     const previous = saveTimers.current.get(item.titleId);
-    if (previous) window.clearTimeout(previous);
-    const timer = window.setTimeout(() => {
+    if (previous) clearTimeout(previous);
+    const timer = setTimeout(() => {
       saveTimers.current.delete(item.titleId);
       void persist(item);
     }, delay);
@@ -126,7 +126,7 @@ export function useDucere() {
   }, [persist, userId]);
 
   useEffect(() => () => {
-    saveTimers.current.forEach((timer) => window.clearTimeout(timer));
+    saveTimers.current.forEach((timer) => clearTimeout(timer));
     saveTimers.current.clear();
   }, []);
 
