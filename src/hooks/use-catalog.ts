@@ -23,11 +23,11 @@ export function useCatalog() {
     };
     let idleId: number;
     let usedIdleCallback = false;
-    if ('requestIdleCallback' in window) {
+    if (typeof window.requestIdleCallback === 'function') {
       usedIdleCallback = true;
       idleId = window.requestIdleCallback(start, { timeout: 1200 });
     } else {
-      idleId = window.setTimeout(start, 350);
+      idleId = window.setTimeout(start, 350) as unknown as number;
     }
     return () => {
       active = false;
