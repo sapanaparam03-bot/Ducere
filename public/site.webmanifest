@@ -1,0 +1,13 @@
+{
+  "name": "Ducere",
+  "short_name": "Ducere",
+  "description": "Track what you watch, what you want to watch, and where you can watch it.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0f18",
+  "theme_color": "#0d0f18",
+  "icons": [
+    { "src": "/ducere-mark.svg", "sizes": "64x64", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/favicon.svg", "sizes": "32x32", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
