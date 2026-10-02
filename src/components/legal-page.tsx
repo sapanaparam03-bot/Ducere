@@ -57,7 +57,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
         <ArrowRight size={14} className="rotate-180" /> Back to Ducere
       </Link>
       <div className="mb-8 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e47a58] text-[#17151f]"><Film size={19} /></span>
+        <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl"><img src="/ducere-mark.svg" alt="Ducere" className="h-full w-full object-cover" /></span>
         <span className="font-display text-2xl">ducere</span>
       </div>
       <p className="font-mono-ui text-[10px] uppercase tracking-[.24em] text-[#df8265]">{page.eyebrow}</p>
