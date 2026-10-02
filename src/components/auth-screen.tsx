@@ -61,7 +61,7 @@ export function AuthScreen() {
         <div className="grid w-full overflow-hidden rounded-[22px] border border-[#2d3040] bg-[#151722] shadow-2xl md:grid-cols-[1.05fr_.95fr]">
           <div className="hidden min-h-[620px] flex-col justify-between bg-[radial-gradient(circle_at_70%_25%,rgba(228,122,88,.25),transparent_35%),linear-gradient(145deg,#211e2b,#10121d)] p-10 md:flex">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e47a58] text-[#17151f]"><Film size={19} /></span>
+              <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl"><img src="/ducere-mark.svg" alt="Ducere" className="h-full w-full object-cover" /></span>
               <span className="font-display text-2xl">ducere</span>
             </div>
             <div>
@@ -74,7 +74,7 @@ export function AuthScreen() {
 
           <div className="flex min-h-[620px] flex-col justify-center p-6 sm:p-10">
             <div className="mb-8 md:hidden">
-              <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e47a58] text-[#17151f]"><Film size={17} /></span><span className="font-display text-2xl">ducere</span></div>
+              <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl"><img src="/ducere-mark.svg" alt="Ducere" className="h-full w-full object-cover" /></span><span className="font-display text-2xl">ducere</span></div>
             </div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[.22em] text-[#df8265]">{mode === 'signin' ? 'Welcome back' : 'Start your archive'}</p>
             <h2 className="mt-2 font-display text-4xl tracking-[-.04em] text-[#f0e7da]">{mode === 'signin' ? 'Sign in to Ducere.' : 'Create your Ducere account.'}</h2>
