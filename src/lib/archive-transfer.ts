@@ -91,7 +91,7 @@ const rowToUserTitle = (row: Record<string, string>, catalog: Title[]): UserTitl
       progress: 100,
     } : {}),
     ...(Number.isFinite(ratingValue) && ratingValue > 0 ? { rating: Math.max(1, Math.min(5, Math.round(ratingValue > 5 ? ratingValue / 2 : ratingValue))) } : {}),
-    ...(Number.isFinite(progressValue) ? { progress: Math.max(0, Math.min(100, progressValue)) } : {}),
+    ...(!watched && Number.isFinite(progressValue) ? { progress: Math.max(0, Math.min(100, progressValue)) } : {}),
     ...(Number.isFinite(episodeValue) && episodeValue > 0 && title.type !== 'movie' ? {
       currentEpisode: Math.floor(episodeValue),
       currentSeason: Math.max(1, Math.floor(Number.isFinite(seasonValue) ? seasonValue : 1)),
