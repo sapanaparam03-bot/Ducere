@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { TITLES, type Title, type TitleType } from '@/lib/ducere';
 import { loadLiveCatalog } from '@/lib/live-catalog';
 import { cancelExternalCatalogueSearch, searchExternalCatalogue } from '@/lib/catalogue-search';
+import { mergeCatalogueTitles } from '@/lib/catalogue-utils.js';
 
 const SELECTED_TITLES_KEY = 'ducere-selected-catalogue-v1';
 
@@ -38,21 +39,8 @@ const readSelectedTitles = (): Title[] => {
   }
 };
 
-const mergeTitles = (current: Title[], incoming: Title[]) => {
-  const byId = new Map<string, Title>();
-  for (const title of [...current, ...incoming]) {
-    byId.delete(title.id);
-    byId.set(title.id, title);
-  }
-
-  const builtInIds = new Set(TITLES.map((title) => title.id));
-  const selected = readSelectedTitles();
-  const selectedIds = new Set(selected.map((title) => title.id));
-  const retained = [...byId.values()].filter((title) => !builtInIds.has(title.id) && selectedIds.has(title.id));
-  const recent = [...byId.values()].filter((title) =>
-    !builtInIds.has(title.id) && !selectedIds.has(title.id));
-  return [...TITLES, ...retained, ...recent.slice(-300)];
-};
+const mergeTitles = (current: Title[], incoming: Title[]) =>
+  mergeCatalogueTitles(TITLES, readSelectedTitles(), current, incoming, 300);
 
 export function useCatalog() {
   const [titles, setTitles] = useState<Title[]>(() => mergeTitles(TITLES, readSelectedTitles()));
