@@ -166,12 +166,20 @@ export async function searchExternalCatalogue(query: string, type: 'all' | Title
     ...(seriesResult.status === 'fulfilled' ? seriesResult.value : []),
     ...(wikidataResult.status === 'fulfilled' ? wikidataResult.value : []),
   ];
-  const seen = new Set<string>();
-  const unique = titles.filter((title) => {
-    if (seen.has(title.id)) return false;
-    seen.add(title.id);
-    return true;
-  });
+  const unique: Title[] = [];
+  const seenIds = new Set<string>();
+  for (const title of titles) {
+    if (seenIds.has(title.id)) continue;
+    seenIds.add(title.id);
+    const normalizedName = title.name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const duplicate = unique.some((existing) => {
+      if (existing.type !== title.type) return false;
+      const existingName = existing.name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      return existingName === normalizedName &&
+        (!existing.releaseYear || !title.releaseYear || existing.releaseYear === title.releaseYear);
+    });
+    if (!duplicate) unique.push(title);
+  }
 
   if (unique.length === 0 && seriesResult.status === 'rejected' && wikidataResult.status === 'rejected') {
     throw new Error('Catalogue search is temporarily unavailable. Please try again.');
