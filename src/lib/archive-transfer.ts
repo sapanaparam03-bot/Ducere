@@ -76,14 +76,18 @@ const rowToUserTitle = (row: Record<string, string>, catalog: Title[]): UserTitl
   const ratingValue = Number(row['your rating'] || row['score'] || row['rating'] || '');
   const episodeValue = Number(row['episodes watched'] || row['episode'] || row['current episode'] || '');
   const seasonValue = Number(row['season'] || row['current season'] || '1');
-  const progressValue = Number(row['progress'] || '');
+  const rawProgress = row['progress']?.trim() ?? '';
+  const progressValue = rawProgress ? Number(rawProgress) : Number.NaN;
+  const rawDateAdded = row['date added'] || row['date'] || '';
+  const rawDateWatched = row['watched date'] || row['date watched'] || row['date rated'] || '';
+  const today = new Date().toISOString().slice(0, 10);
 
   return {
     titleId: title.id,
     status,
-    dateAdded: row['date added'] || row['date'] || new Date().toISOString().slice(0, 10),
+    dateAdded: isDateOnly(rawDateAdded) ? rawDateAdded : today,
     ...(watched ? {
-      dateWatched: row['watched date'] || row['date watched'] || row['date rated'] || undefined,
+      ...(isDateOnly(rawDateWatched) ? { dateWatched: rawDateWatched } : {}),
       progress: 100,
     } : {}),
     ...(Number.isFinite(ratingValue) && ratingValue > 0 ? { rating: Math.max(1, Math.min(5, Math.round(ratingValue > 5 ? ratingValue / 2 : ratingValue))) } : {}),
