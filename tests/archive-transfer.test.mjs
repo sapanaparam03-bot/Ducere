@@ -17,7 +17,7 @@ const catalog = [
 ];
 
 test('CSV import respects a supplied release year and avoids the wrong adaptation', () => {
-  const accented = transfer.importCsvText('Title,Year,Status\\nAmélie: Part II!,2001,Completed', catalog);
+  const accented = transfer.importCsvText('Title,Year,Status\nAmélie: Part II!,2001,Completed', catalog);
   assert.equal(accented.items[0]?.titleId, 'amelie-2001');
   const result = transfer.importCsvText('Title,Year,Status\nThe Lion King,2019,Completed', catalog);
   assert.equal(result.rows, 1);
