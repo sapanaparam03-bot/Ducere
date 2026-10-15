@@ -1,4 +1,5 @@
 import { coverArt, type Title, type TitleType } from './ducere';
+import { deduplicateCatalogueTitles, inferMediaTypeFromDescription } from './catalogue-utils.js';
 
 type TvMazeSearchEntry = {
   show?: {
@@ -66,17 +67,10 @@ const mapTvMazeResult = (entry: TvMazeSearchEntry): Title | null => {
   };
 };
 
-const typeFromDescription = (description: string): TitleType | null => {
-  if (/\b(anime|Japanese animated)\b/i.test(description) && /\b(series|film|movie|animation|television)\b/i.test(description)) return 'anime';
-  if (/\b(television series|tv series|television show|television program|sitcom)\b/i.test(description)) return 'tv';
-  if (/\b(film|movie|motion picture)\b/i.test(description)) return 'movie';
-  return null;
-};
-
 const mapWikidataResult = (entry: WikidataSearchEntry, requestedType: 'all' | TitleType): Title | null => {
   const name = entry.label?.trim();
   const description = entry.description?.trim() ?? '';
-  const detectedType = typeFromDescription(description);
+  const detectedType = inferMediaTypeFromDescription(description);
   if (!name || !detectedType || (requestedType !== 'all' && detectedType !== requestedType)) return null;
 
   const year = yearFromDescription(description);
@@ -181,20 +175,7 @@ export async function searchExternalCatalogue(query: string, type: 'all' | Title
       ...(seriesResult.status === 'fulfilled' ? seriesResult.value : []),
       ...(wikidataResult.status === 'fulfilled' ? wikidataResult.value : []),
     ];
-    const unique: Title[] = [];
-    const seenIds = new Set<string>();
-    for (const title of titles) {
-      if (seenIds.has(title.id)) continue;
-      seenIds.add(title.id);
-      const normalizedName = title.name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-      const duplicate = unique.some((existing) => {
-        if (existing.type !== title.type) return false;
-        const existingName = existing.name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-        return existingName === normalizedName &&
-          (!existing.releaseYear || !title.releaseYear || existing.releaseYear === title.releaseYear);
-      });
-      if (!duplicate) unique.push(title);
-    }
+    const unique = deduplicateCatalogueTitles(titles);
 
     if (controller.signal.aborted) throw new DOMException('Search cancelled', 'AbortError');
     if (unique.length === 0 && seriesResult.status === 'rejected' && wikidataResult.status === 'rejected') {
