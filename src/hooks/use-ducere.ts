@@ -48,6 +48,8 @@ export function useDucere() {
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const loadSessionData = useCallback(async (uid: string | null) => {
+    saveTimers.current.forEach((timer) => clearTimeout(timer));
+    saveTimers.current.clear();
     setUserId(uid);
     setDataError(null);
     if (!uid || !supabase) {
@@ -144,6 +146,9 @@ export function useDucere() {
   }, [schedulePersist]);
 
   const remove = useCallback((titleId: string) => {
+    const pendingSave = saveTimers.current.get(titleId);
+    if (pendingSave) clearTimeout(pendingSave);
+    saveTimers.current.delete(titleId);
     setUserTitles((current) => current.filter((item) => item.titleId !== titleId));
     if (userId && supabase) {
       void supabase
@@ -207,6 +212,8 @@ export function useDucere() {
   }, [userId]);
 
   const resetData = useCallback(async () => {
+    saveTimers.current.forEach((timer) => clearTimeout(timer));
+    saveTimers.current.clear();
     if (userId && supabase) {
       const { error } = await supabase.from('user_titles').delete().eq('user_id', userId);
       if (error) {
