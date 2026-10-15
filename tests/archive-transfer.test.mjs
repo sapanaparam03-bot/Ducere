@@ -13,9 +13,12 @@ const catalog = [
   { id: 'lion-1994', name: 'The Lion King', type: 'movie', releaseYear: 1994, genres: [], rating: 8, runtime: '88m' },
   { id: 'lion-2019', name: 'The Lion King', type: 'movie', releaseYear: 2019, genres: [], rating: 7, runtime: '118m' },
   { id: 'show-1', name: 'Example Show', type: 'tv', releaseYear: 2020, genres: [], rating: 7, runtime: '', episodes: 10 },
+  { id: 'amelie-2001', name: 'Amelie Part II', type: 'movie', releaseYear: 2001, genres: [], rating: 7, runtime: '90m' },
 ];
 
 test('CSV import respects a supplied release year and avoids the wrong adaptation', () => {
+  const accented = transfer.importCsvText('Title,Year,Status\\nAmélie: Part II!,2001,Completed', catalog);
+  assert.equal(accented.items[0]?.titleId, 'amelie-2001');
   const result = transfer.importCsvText('Title,Year,Status\nThe Lion King,2019,Completed', catalog);
   assert.equal(result.rows, 1);
   assert.equal(result.items.length, 1);
