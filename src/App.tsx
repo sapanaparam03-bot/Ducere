@@ -243,36 +243,6 @@ function SectionHeading({ eyebrow, title, href, linkLabel = 'See all' }: { eyebr
   return <div className="mb-4 flex items-end justify-between"><div><p className="font-mono-ui text-[9px] uppercase tracking-[.2em] text-[#df8265]">{eyebrow}</p><h2 className="mt-1 text-lg font-bold tracking-[-.02em] text-[#e9e1d6]">{title}</h2></div>{href && <Link href={href} className="flex items-center gap-1 text-xs font-semibold text-[#bd8a78] transition hover:text-[#eda07f]" data-testid={`link-see-${title.toLowerCase().replaceAll(' ', '-')}`}>{linkLabel}<ArrowRight size={14} /></Link>}</div>;
 }
 
-const wikiImageCache = new Map<string, string | null>();
-
-async function findWikipediaArtwork(title: string) {
-  const key = title.trim().toLowerCase();
-  if (wikiImageCache.has(key)) return wikiImageCache.get(key) ?? null;
-  try {
-    const params = new URLSearchParams({
-      action: 'query',
-      generator: 'search',
-      gsrsearch: title,
-      gsrnamespace: '0',
-      gsrlimit: '1',
-      prop: 'pageimages',
-      piprop: 'thumbnail',
-      pithumbsize: '600',
-      format: 'json',
-      origin: '*',
-    });
-    const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`);
-    if (!response.ok) throw new Error('Wikipedia artwork request failed');
-    const json = await response.json() as { query?: { pages?: Record<string, { thumbnail?: { source?: string } }> } };
-    const source = Object.values(json.query?.pages ?? {})[0]?.thumbnail?.source ?? null;
-    wikiImageCache.set(key, source);
-    return source;
-  } catch {
-    wikiImageCache.set(key, null);
-    return null;
-  }
-}
-
 function PosterCard({ title, userTitle, onStatus }: { title: Title; userTitle?: DucereProps['userTitles'][number]; onStatus?: (status: UserStatus) => void }) {
   const [poster, setPoster] = useState(title.poster);
   const [broken, setBroken] = useState(false);
@@ -406,14 +376,6 @@ function StatTile({ label, value, icon }: { label: string; value: number; icon: 
 
 function EmptyState({ icon, title, copy, href, action }: { icon: ReactNode; title: string; copy: string; href: string; action: string }) {
   return <div className="panel-soft flex flex-col items-center justify-center rounded-2xl px-6 py-12 text-center"><div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#e47a58]/20 bg-[#e47a58]/10 text-[#e47a58]">{icon}</div><h3 className="font-display text-2xl text-[#e7ddce]">{title}</h3><p className="mt-2 max-w-sm text-xs leading-5 text-[#858797]">{copy}</p><Link href={href} className="mt-5 inline-flex items-center gap-2 rounded-lg border border-[#6a3f37] px-3.5 py-2 text-[11px] font-bold text-[#e78b6c] transition hover:bg-[#e47a58]/10" data-testid={`link-empty-${action.toLowerCase().replaceAll(' ', '-')}`}>{action}<ArrowRight size={13} /></Link></div>;
-}
-
-function DiscoverPage({ userTitles, setStatus }: DucereProps) {
-  const query = new URLSearchParams(window.location.search).get('q') ?? '';
-  const [search, setSearch] = useState(query);
-  const [type, setType] = useState<'all' | TitleType>('all');
-  const results = useMemo(() => TITLES.filter((title) => (type === 'all' || title.type === type) && `${title.name} ${title.genres.join(' ')}`.toLowerCase().includes(search.toLowerCase())), [search, type]);
-  return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12"><PageIntro eyebrow="Discover" title="Find your next film." description="A handpicked shelf of movies, series, and anime. Search by title or mood." /><div className="mb-10 flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777989]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search titles; missing series are looked up live" className="h-12 w-full rounded-xl border border-[#303345] bg-[#171a27] pl-11 pr-4 text-sm outline-none placeholder:text-[#686a7a] focus:border-[#d17459]" data-testid="input-discover-search" /></div><div className="flex gap-2">{(['all', 'movie', 'tv', 'anime'] as const).map((filter) => <button key={filter} onClick={() => setType(filter)} className={`rounded-xl px-4 py-2 text-[11px] font-bold capitalize transition ${type === filter ? 'bg-[#e47a58] text-[#211923]' : 'border border-[#303345] text-[#9495a3] hover:border-[#765045]'}`} data-testid={`button-filter-${filter}`}>{filter === 'all' ? 'Everything' : filter === 'tv' ? 'Series' : filter}</button>)}</div></div><div className="mb-5 flex items-center justify-between"><p className="text-xs text-[#777989]"><span className="font-bold text-[#e2d8c8]">{results.length}</span> titles in the archive</p><button className="flex items-center gap-2 text-[11px] font-semibold text-[#8d8f9f]" data-testid="button-discover-sort"><SlidersHorizontal size={14} /> Curated order</button></div>{results.length ? <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{results.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}</div>;
 }
 
 function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalogError, catalogSearch, catalogSearching, catalogCancel, catalogRetain }: DucereProps) {
@@ -771,10 +733,6 @@ function ImportPanel({ catalog, upsert, profile, userTitles, updateProfile }: { 
     {message && <p className="mt-3 text-[11px] leading-5 text-[#87bd9d]" data-testid="text-import-result">{message}</p>}
   </div>;
 }
-function SettingSwitch({ label, copy, value, onChange, testId }: { label: string; copy: string; value: boolean; onChange: (value: boolean) => void; testId: string }) {
-  return <div className="flex items-center justify-between gap-4 py-4"><div><p className="text-xs font-semibold text-[#c9c0ba]">{label}</p><p className="mt-1 text-[10px] leading-5 text-[#77798a]">{copy}</p></div><button onClick={() => onChange(!value)} className={`relative h-6 w-11 shrink-0 rounded-full transition ${value ? 'bg-[#e47a58]' : 'bg-[#3b3d4d]'}`} role="switch" aria-checked={value} data-testid={testId}><span className={`absolute top-1 h-4 w-4 rounded-full bg-[#f5ebdb] transition-transform ${value ? 'translate-x-6' : 'translate-x-1'}`} /></button></div>;
-}
-
 function NotFound() {
   return <div className="mx-auto max-w-[700px] px-6 py-28 text-center"><p className="font-mono-ui text-[10px] uppercase tracking-[.24em] text-[#df8265]">404 · reel missing</p><h1 className="mt-4 font-display text-5xl text-[#f0e5d5]">That scene is not here.</h1><p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-[#858796]">The title or page you are looking for may have been moved.</p><Link href="/" className="mt-7 inline-flex items-center gap-2 rounded-lg bg-[#e47a58] px-4 py-2.5 text-xs font-bold text-[#211923]" data-testid="link-not-found-home">Return home <ArrowRight size={14} /></Link></div>;
 }
