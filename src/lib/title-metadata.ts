@@ -71,24 +71,34 @@ const fetchWithTimeout = async <T,>(url: string, init?: RequestInit): Promise<T>
 };
 
 const normalizeTitle = (value: string) =>
-  value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Return a metadata candidate only when its normalized name matches the requested title. */
+export function findExactNameMatch<T>(
+  items: T[],
+  getName: (item: T) => string | undefined,
+  target: string,
+): T | undefined {
+  const normalizedTarget = normalizeTitle(target);
+  if (!normalizedTarget) return undefined;
+  return items.find((item) => normalizeTitle(getName(item) ?? '') === normalizedTarget);
+}
 
 const tvMazeImage = async (title: Title) => {
   const query = encodeURIComponent(title.name);
   const results = await fetchWithTimeout<TvMazeSearchResult[]>(`https://api.tvmaze.com/search/shows?q=${query}`);
-  const exact = results.find((entry) => normalizeTitle(entry.show?.name ?? '') === normalizeTitle(title.name));
-  return exact?.show?.image?.original ??
-    exact?.show?.image?.medium ??
-    results[0]?.show?.image?.original ??
-    results[0]?.show?.image?.medium ??
-    null;
+  // A first-result fallback can attach a different show’s artwork to this title.
+  const exact = findExactNameMatch(results, (entry) => entry.show?.name, title.name);
+  return exact?.show?.image?.original ?? exact?.show?.image?.medium ?? null;
 };
 
 const tvMazeSeasons = async (title: Title) => {
   const id = title.id.match(/^tvmaze-(\d+)$/)?.[1];
-  const showId = id ?? (
-    await fetchWithTimeout<TvMazeSearchResult[]>(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(title.name)}`)
-  )[0]?.show?.id?.toString();
+  let showId = id;
+  if (!showId) {
+    const results = await fetchWithTimeout<TvMazeSearchResult[]>(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(title.name)}`);
+    showId = findExactNameMatch(results, (entry) => entry.show?.name, title.name)?.show?.id?.toString();
+  }
   if (!showId) return {};
 
   const seasons = await fetchWithTimeout<TvMazeSeason[]>(`https://api.tvmaze.com/shows/${showId}/seasons`);
@@ -157,7 +167,7 @@ const aniListMetadata = async (title: Title) => {
   // as Demon Slayer can reflect multiple TV seasons without loading this at startup.
   let currentId = directTvRelations.find((edge) => edge.relationType === 'SEQUEL')?.node?.id;
   for (let depth = 0; currentId && depth < 10; depth++) {
-    const linked = await fetchWithTimeout<AniListResponse>(`https://graphql.anilist.co`, {
+    const linked = await fetchWithTimeout<AniListResponse>('https://graphql.anilist.co', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -224,8 +234,8 @@ const wikipediaArtwork = async (title: string) => {
       `https://en.wikipedia.org/w/api.php?${params.toString()}`,
     );
     const pages = Object.values(json.query?.pages ?? {});
-    const exact = pages.find((page) => normalizeTitle(page.title ?? '') === normalizeTitle(title));
-    return exact?.thumbnail?.source ?? pages[0]?.thumbnail?.source ?? null;
+    // Search relevance is not proof that a page represents the requested title.
+    return findExactNameMatch(pages, (page) => page.title, title)?.thumbnail?.source ?? null;
   } catch {
     return null;
   }
