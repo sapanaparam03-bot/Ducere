@@ -212,8 +212,6 @@ export function useDucere() {
   }, [userId]);
 
   const resetData = useCallback(async () => {
-    saveTimers.current.forEach((timer) => clearTimeout(timer));
-    saveTimers.current.clear();
     if (userId && supabase) {
       const { error } = await supabase.from('user_titles').delete().eq('user_id', userId);
       if (error) {
@@ -222,6 +220,8 @@ export function useDucere() {
         return;
       }
     }
+    saveTimers.current.forEach((timer) => clearTimeout(timer));
+    saveTimers.current.clear();
     setUserTitles([]);
     setProfile(INITIAL_PROFILE);
     setDataError(null);
