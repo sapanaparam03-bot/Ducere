@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { TITLES, type Title } from '@/lib/ducere';
+import { TITLES, type Title, type TitleType } from '@/lib/ducere';
 import { loadLiveCatalog } from '@/lib/live-catalog';
 import { searchExternalCatalogue } from '@/lib/catalogue-search';
 
@@ -29,7 +29,7 @@ export function useCatalog() {
     return () => { active = false; };
   }, []);
 
-  const search = useCallback(async (query: string, type: 'all' | import('@/lib/ducere').TitleType = 'all') => {
+  const search = useCallback(async (query: string, type: 'all' | TitleType = 'all') => {
     const normalized = query.trim();
     if (normalized.length < 2) return [];
     setSearching(true);
