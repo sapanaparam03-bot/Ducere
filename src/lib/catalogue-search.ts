@@ -33,7 +33,6 @@ const mapTvMazeResult = (entry: TvMazeSearchEntry): Title | null => {
   const show = entry.show;
   if (!show?.id || !show.name?.trim()) return null;
   const poster = show.image?.original ?? show.image?.medium ?? coverArt(show.name, 'tv');
-  const broadcaster = show.network?.name ?? show.webChannel?.name;
   const rating = show.rating?.average;
   const description = stripMarkup(show.summary);
   return {
