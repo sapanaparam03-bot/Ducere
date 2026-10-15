@@ -146,6 +146,7 @@ export function useDucere() {
   }, [schedulePersist]);
 
   const remove = useCallback((titleId: string) => {
+    const removedItem = userTitles.find((item) => item.titleId === titleId);
     const pendingSave = saveTimers.current.get(titleId);
     if (pendingSave) clearTimeout(pendingSave);
     saveTimers.current.delete(titleId);
@@ -160,10 +161,24 @@ export function useDucere() {
           if (error) {
             console.error('Ducere: failed to remove title', error);
             setDataError('Some changes could not be saved. Please retry.');
+            if (removedItem) {
+              setUserTitles((current) => current.some((item) => item.titleId === titleId)
+                ? current
+                : [...current, removedItem]);
+            }
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('Ducere: remove request failed', error);
+          setDataError('We could not reach the server. Your title was restored locally.');
+          if (removedItem) {
+            setUserTitles((current) => current.some((item) => item.titleId === titleId)
+              ? current
+              : [...current, removedItem]);
           }
         });
     }
-  }, [userId]);
+  }, [userId, userTitles]);
 
   const setStatus = useCallback((titleId: string, status: UserStatus) => {
     upsert(titleId, {
