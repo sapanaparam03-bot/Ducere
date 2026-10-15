@@ -9,6 +9,10 @@ create table if not exists public.catalogue_titles (
   id text primary key,
   source text not null,
   source_id text not null,
+  source_license text,
+  source_url text,
+  license_reviewed_at timestamptz,
+  expires_at timestamptz,
   media_type text not null check (media_type in ('movie', 'tv', 'anime')),
   title text not null,
   original_title text,
@@ -115,3 +119,11 @@ create policy "catalogue availability is readable"
 
 -- Deliberately no INSERT/UPDATE/DELETE policies for anon/authenticated:
 -- provider imports and refreshes must run through a trusted backend.
+
+-- RLS policies control rows; explicit SELECT grants make the intended read-only
+-- Data API access clear when project-level default grants are restricted.
+grant select on public.catalogue_titles to anon, authenticated;
+grant select on public.catalogue_external_ids to anon, authenticated;
+grant select on public.catalogue_seasons to anon, authenticated;
+grant select on public.catalogue_episodes to anon, authenticated;
+grant select on public.catalogue_streaming_availability to anon, authenticated;
