@@ -63,3 +63,9 @@ test('10,000 repeated updates stay bounded and preserve newest entries', () => {
   assert.equal(current.at(-1).id, 'item-9999');
   assert.equal(new Set(current.map((item) => item.id)).size, current.length);
 });
+
+
+test('a zero recent-cache limit retains only built-in and selected titles', () => {
+  const result = mergeCatalogueTitles([{ id: 'base' }], [{ id: 'saved' }], [{ id: 'base' }, { id: 'saved' }, { id: 'old' }], [{ id: 'new' }], 0);
+  assert.deepEqual(result.map((item) => item.id), ['base', 'saved']);
+});
