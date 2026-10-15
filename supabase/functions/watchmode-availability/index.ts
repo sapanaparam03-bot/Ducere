@@ -47,12 +47,29 @@ Deno.serve(async (req) => {
     const search = await fetchJson<{ title_results?: SearchResult[] }>(searchUrl.toString());
     const candidates = search.title_results ?? [];
 
-    const exact = candidates.find((candidate) =>
+    const exactCandidates = candidates.filter((candidate) =>
+      Boolean(candidate.id) &&
       normalized(candidate.title ?? "") === normalized(titleName) &&
       (!candidate.type || candidate.type.toLowerCase().includes(mediaType === "movie" ? "movie" : "tv"))
-    ) ?? candidates.find((candidate) => normalized(candidate.title ?? "") === normalized(titleName)) ?? candidates[0];
+    );
 
-    if (!exact?.id) return json({ titleId: 0, titleName, sources: [], attributionRequired: true });
+    // Never show a different title's providers just because it ranked first in search.
+    // When Watchmode supplies a year, prefer an exact year match; if the year conflicts,
+    // return no result rather than falsely labeling another release as verified.
+    const exact = year > 0
+      ? exactCandidates.find((candidate) => candidate.year === year) ??
+        exactCandidates.find((candidate) => !candidate.year)
+      : exactCandidates[0];
+
+    if (!exact?.id) {
+      return json({
+        titleId: 0,
+        titleName,
+        sources: [],
+        attributionRequired: true,
+        message: "No exact title match was found for this region.",
+      });
+    }
 
     const sourceUrl = new URL(`https://api.watchmode.com/v1/title/${exact.id}/sources/`);
     sourceUrl.searchParams.set("apiKey", apiKey);
