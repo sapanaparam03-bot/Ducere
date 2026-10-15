@@ -56,7 +56,7 @@ const mapTvMazeResult = (entry: TvMazeSearchEntry): Title | null => {
     rating: typeof rating === 'number' ? Math.round(rating * 10) / 10 : 0,
     runtime: show.averageRuntime || show.runtime ? `${show.averageRuntime ?? show.runtime} min episodes` : 'Series',
     cast: [],
-    director: 'TVmaze',
+    director: 'Not listed',
     providers: [],
     source: {
       name: 'TVmaze',
@@ -92,7 +92,7 @@ const mapWikidataResult = (entry: WikidataSearchEntry, requestedType: 'all' | Ti
     rating: 0,
     runtime: detectedType === 'movie' ? 'Feature film' : 'Series',
     cast: [],
-    director: 'Wikidata',
+    director: 'Not listed',
     providers: [],
     source: {
       name: 'Wikidata',
