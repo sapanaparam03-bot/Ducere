@@ -23,30 +23,6 @@ import { AchievementPanel } from '@/components/achievement-panel';
 import { downloadDucereBackup, downloadDucereCsv, formatImportSummary, importCsvText, parseDucereBackup } from '@/lib/archive-transfer';
 
 
-function parseCsv(text: string): Record<string, string>[] {
-  const rows: string[][] = []; let row: string[] = []; let cell = ''; let quoted = false;
-  for (let i = 0; i < text.length; i++) { const ch = text[i], next = text[i + 1]; if (ch === '"' && quoted && next === '"') { cell += '"'; i++; } else if (ch === '"') quoted = !quoted; else if (ch === ',' && !quoted) { row.push(cell); cell = ''; } else if ((ch === '\n' || ch === '\r') && !quoted) { if (ch === '\r' && next === '\n') i++; row.push(cell); if (row.some((v) => v.trim())) rows.push(row); row = []; cell = ''; } else cell += ch; }
-  if (cell || row.length) { row.push(cell); if (row.some((v) => v.trim())) rows.push(row); }
-  const headers = (rows.shift() ?? []).map((h) => h.trim().toLowerCase());
-  return rows.map((values) => Object.fromEntries(headers.map((h, i) => [h, (values[i] ?? '').trim()])));
-}
-const normalizeImportTitle = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-const importRows = (rows: Record<string, string>[], catalog: Title[]) => {
-  const byName = new Map(catalog.map((title) => [normalizeImportTitle(title.name), title]));
-  return rows.flatMap((row) => {
-    const rawName = row['title'] || row['name'] || row['title name'] || row['anime title'] || '';
-    const title = byName.get(normalizeImportTitle(rawName));
-    if (!title) return [];
-    const rawStatus = (row['status'] || '').toLowerCase();
-    const watched = rawStatus.includes('completed') || rawStatus.includes('watched') || Boolean(row['watched date'] || row['date watched'] || row['date rated']);
-    const watching = rawStatus.includes('watching') || rawStatus.includes('currently watching');
-    const status: UserStatus = watching ? 'watching' : watched ? 'watched' : 'watchlist';
-    const ratingValue = Number(row['your rating'] || row['score'] || row['rating'] || '');
-    const episodeValue = Number(row['episodes watched'] || row['episodes watched'] || '');
-    return [{ titleId: title.id, status, dateAdded: row['date added'] || row['date'] || new Date().toISOString().slice(0, 10), ...(watched ? { dateWatched: row['watched date'] || row['date watched'] || row['date rated'] || undefined, progress: 100 } : {}), ...(Number.isFinite(ratingValue) && ratingValue > 0 ? { rating: Math.max(1, Math.min(5, Math.round(ratingValue / 2))) } : {}), ...(Number.isFinite(episodeValue) && episodeValue > 0 && title.type !== 'movie' ? { currentEpisode: Math.floor(episodeValue), currentSeason: 1, progress: watched ? 100 : undefined } : {}) } as UserTitle];
-  });
-};
-
 const queryClient = new QueryClient();
 
 const navItems = [
