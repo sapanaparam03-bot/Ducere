@@ -465,7 +465,7 @@ function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalo
   }, [userTitles, catalog]);
   const recommendations = useMemo(() => rankRecommendations(userTitles, catalog).slice(0, 6), [catalog, userTitles]);
   return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12">
-    <PageIntro eyebrow="Discover" title="Find your next film." description="A curated shelf backed by a growing live index of series and anime. Search by title, genre, or mood." />
+    <PageIntro eyebrow="Discover" title="Find your next film." description="A curated shelf with on-demand series search. Search by title, genre, or mood." />
     <div className="mb-10 flex flex-col gap-3 sm:flex-row">
       <div className="relative flex-1"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777989]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search titles; missing series are looked up live" className="h-12 w-full rounded-xl border border-[#303345] bg-[#171a27] pl-11 pr-4 text-sm outline-none placeholder:text-[#686a7a] focus:border-[#d17459]" data-testid="input-discover-search" /></div>
       <div className="flex gap-2 overflow-x-auto">{(['all', 'movie', 'tv', 'anime'] as const).map((filter) => <button key={filter} onClick={() => setType(filter)} className={`rounded-xl px-4 py-2 text-[11px] font-bold capitalize transition ${type === filter ? 'bg-[#e47a58] text-[#211923]' : 'border border-[#303345] text-[#9495a3] hover:border-[#765045]'}`} data-testid={`button-filter-${filter}`}>{filter === 'all' ? 'Everything' : filter === 'tv' ? 'Series' : filter}</button>)}</div>
