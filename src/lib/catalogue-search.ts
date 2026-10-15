@@ -67,7 +67,7 @@ const mapTvMazeResult = (entry: TvMazeSearchEntry): Title | null => {
 };
 
 const typeFromDescription = (description: string): TitleType | null => {
-  if (/\banime\b/i.test(description) && /\b(series|film|movie|animation|television)\b/i.test(description)) return 'anime';
+  if (/\b(anime|Japanese animated)\b/i.test(description) && /\b(series|film|movie|animation|television)\b/i.test(description)) return 'anime';
   if (/\b(television series|tv series|television show|television program|sitcom)\b/i.test(description)) return 'tv';
   if (/\b(film|movie|motion picture)\b/i.test(description)) return 'movie';
   return null;
