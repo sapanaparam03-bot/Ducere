@@ -664,6 +664,10 @@ function ImportPanel({ catalog, upsert, profile, userTitles, updateProfile }: { 
   const [busy, setBusy] = useState(false);
 
   const handleFile = async (file: File) => {
+    if (file.size > 10_000_000) {
+      setMessage('This file is too large to import (maximum 10 MB).');
+      return;
+    }
     setBusy(true);
     setMessage('');
     try {
@@ -700,6 +704,7 @@ function ImportPanel({ catalog, upsert, profile, userTitles, updateProfile }: { 
             return;
           }
           upsert(item.titleId, item);
+          ids.add(item.titleId);
           imported += 1;
         });
         const invalid = Math.max(0, rows - items.length);
