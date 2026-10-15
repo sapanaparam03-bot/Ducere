@@ -46,12 +46,15 @@ export function useDucere() {
   const [userId, setUserId] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const sessionRequestId = useRef(0);
 
   const loadSessionData = useCallback(async (uid: string | null) => {
+    const requestId = ++sessionRequestId.current;
     saveTimers.current.forEach((timer) => clearTimeout(timer));
     saveTimers.current.clear();
     setUserId(uid);
     setDataError(null);
+
     if (!uid || !supabase) {
       setUserTitles([]);
       setProfile(INITIAL_PROFILE);
@@ -60,22 +63,34 @@ export function useDucere() {
     }
 
     setReady(false);
-    const [titlesResult, profileResult] = await Promise.all([
-      supabase.from('user_titles').select('*').eq('user_id', uid),
-      supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
-    ]);
+    try {
+      const [titlesResult, profileResult] = await Promise.all([
+        supabase.from('user_titles').select('*').eq('user_id', uid),
+        supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
+      ]);
+      if (requestId !== sessionRequestId.current) return;
 
-    if (titlesResult.error || profileResult.error) {
-      console.error('Ducere: failed to load account data', { titles: titlesResult.error, profile: profileResult.error });
-      setDataError('We could not fully load your archive. Your local session is still available; please retry if data looks incomplete.');
+      if (titlesResult.error || profileResult.error) {
+        console.error('Ducere: failed to load account data', { titles: titlesResult.error, profile: profileResult.error });
+        setDataError('We could not fully load your archive. Showing the last locally saved copy where available.');
+      }
+      setUserTitles(!titlesResult.error
+        ? (titlesResult.data ?? []).map(fromDb)
+        : read<UserTitle[]>(`${USER_KEY}:${uid}`, []));
+      setProfile(
+        !profileResult.error && profileResult.data
+          ? { username: profileResult.data.username, country: profileResult.data.country, appearance: profileResult.data.appearance, onboardingComplete: Boolean(profileResult.data.onboarding_complete), streamingServices: Array.isArray(profileResult.data.streaming_services) ? profileResult.data.streaming_services : [] }
+          : read<Profile>(`${PROFILE_KEY}:${uid}`, INITIAL_PROFILE),
+      );
+    } catch (error) {
+      if (requestId !== sessionRequestId.current) return;
+      console.error('Ducere: account data request failed', error);
+      setDataError('We could not reach the database. Showing the last locally saved copy where available.');
+      setUserTitles(read<UserTitle[]>(`${USER_KEY}:${uid}`, []));
+      setProfile(read<Profile>(`${PROFILE_KEY}:${uid}`, INITIAL_PROFILE));
+    } finally {
+      if (requestId === sessionRequestId.current) setReady(true);
     }
-    setUserTitles(!titlesResult.error ? (titlesResult.data ?? []).map(fromDb) : []);
-    setProfile(
-      !profileResult.error && profileResult.data
-        ? { username: profileResult.data.username, country: profileResult.data.country, appearance: profileResult.data.appearance, onboardingComplete: Boolean(profileResult.data.onboarding_complete), streamingServices: Array.isArray(profileResult.data.streaming_services) ? profileResult.data.streaming_services : [] }
-        : INITIAL_PROFILE,
-    );
-    setReady(true);
   }, []);
 
   useEffect(() => {
@@ -100,11 +115,21 @@ export function useDucere() {
   }, [loadSessionData]);
 
   useEffect(() => {
-    if (userId) localStorage.setItem(`${USER_KEY}:${userId}`, JSON.stringify(userTitles));
+    if (!userId) return;
+    try {
+      localStorage.setItem(`${USER_KEY}:${userId}`, JSON.stringify(userTitles));
+    } catch {
+      setDataError('Your browser could not save a local backup. Cloud sync may still work.');
+    }
   }, [userId, userTitles]);
 
   useEffect(() => {
-    if (userId) localStorage.setItem(`${PROFILE_KEY}:${userId}`, JSON.stringify(profile));
+    if (!userId) return;
+    try {
+      localStorage.setItem(`${PROFILE_KEY}:${userId}`, JSON.stringify(profile));
+    } catch {
+      setDataError('Your browser could not save a local profile backup. Cloud sync may still work.');
+    }
   }, [userId, profile]);
 
   const persist = useCallback(async (item: UserTitle) => {
