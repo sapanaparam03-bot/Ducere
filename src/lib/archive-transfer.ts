@@ -122,12 +122,15 @@ export function downloadDucereBackup(profile: Profile, userTitles: UserTitle[]) 
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 const csvCell = (value: string | number | undefined | null) => {
-  const text = String(value ?? '');
-  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  const original = String(value ?? '');
+  // Spreadsheet applications may execute cells beginning with formula characters.
+  // Prefix an apostrophe even when whitespace/control characters precede the formula.
+  const text = /^[\\u0000-\\u0020]*[=+@-]/.test(original) ? `'${original}` : original;
+  return /[",\\n\\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
 export function downloadDucereCsv(userTitles: UserTitle[], catalog: Title[]) {
@@ -148,7 +151,8 @@ export function downloadDucereCsv(userTitles: UserTitle[], catalog: Title[]) {
       csvCell(item.progress),
     ].join(',');
   });
-  const blob = new Blob([[header.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+  // UTF-8 BOM helps spreadsheet applications preserve non-English title/review text.
+  const blob = new Blob(['\\uFEFF', [header.join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -159,28 +163,75 @@ export function downloadDucereCsv(userTitles: UserTitle[], catalog: Title[]) {
   URL.revokeObjectURL(url);
 }
 
+const isDateOnly = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  /^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+  !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
+  new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+
 export function parseDucereBackup(text: string): DucereBackup {
-  const parsed = JSON.parse(text) as Partial<DucereBackup>;
-  if (parsed.format !== 'ducere-backup' || parsed.version !== 1 || !parsed.profile || !Array.isArray(parsed.titles)) {
+  // Prevent accidental or malicious giant files from exhausting browser memory.
+  if (text.length > 10_000_000) throw new Error('This backup is too large to import (maximum 10 MB).');
+  let parsed: Partial<DucereBackup>;
+  try {
+    parsed = JSON.parse(text) as Partial<DucereBackup>;
+  } catch {
+    throw new Error('The backup file is not valid JSON.');
+  }
+  if (parsed.format !== 'ducere-backup' || parsed.version !== 1 || !parsed.profile || typeof parsed.profile !== 'object' || !Array.isArray(parsed.titles)) {
     throw new Error('This is not a valid Ducere backup file.');
   }
+  if (parsed.titles.length > 50_000) throw new Error('This backup contains too many titles to import safely.');
+
+  const today = new Date().toISOString().slice(0, 10);
+  const byId = new Map<string, UserTitle>();
+  for (const value of parsed.titles) {
+    if (!value || typeof value !== 'object') continue;
+    const item = value as Partial<UserTitle>;
+    if (typeof item.titleId !== 'string' || !item.titleId.trim() || item.titleId.length > 256) continue;
+    if (item.status !== 'watchlist' && item.status !== 'watching' && item.status !== 'watched') continue;
+
+    const rating = typeof item.rating === 'number' && Number.isFinite(item.rating) && item.rating >= 1 && item.rating <= 5
+      ? Math.round(item.rating)
+      : undefined;
+    const season = typeof item.currentSeason === 'number' && Number.isInteger(item.currentSeason) && item.currentSeason >= 1 && item.currentSeason <= 9999
+      ? item.currentSeason
+      : undefined;
+    const episode = typeof item.currentEpisode === 'number' && Number.isInteger(item.currentEpisode) && item.currentEpisode >= 1 && item.currentEpisode <= 9999
+      ? item.currentEpisode
+      : undefined;
+    const progress = typeof item.progress === 'number' && Number.isFinite(item.progress)
+      ? Math.max(0, Math.min(100, item.progress))
+      : undefined;
+    const safe: UserTitle = {
+      titleId: item.titleId.trim(),
+      status: item.status,
+      dateAdded: isDateOnly(item.dateAdded) ? item.dateAdded : today,
+      ...(isDateOnly(item.dateWatched) ? { dateWatched: item.dateWatched } : {}),
+      ...(rating !== undefined ? { rating } : {}),
+      ...(typeof item.review === 'string' ? { review: item.review.slice(0, 5000) } : {}),
+      ...(season !== undefined ? { currentSeason: season } : {}),
+      ...(episode !== undefined ? { currentEpisode: episode } : {}),
+      ...(progress !== undefined ? { progress } : {}),
+    };
+    byId.set(safe.titleId, safe);
+  }
+
+  const profile = parsed.profile;
   return {
     format: 'ducere-backup',
     version: 1,
-    exportedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt : new Date().toISOString(),
+    exportedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt.slice(0, 64) : new Date().toISOString(),
     profile: {
-      username: typeof parsed.profile.username === 'string' ? parsed.profile.username : 'Viewer',
-      country: typeof parsed.profile.country === 'string' ? parsed.profile.country : 'IN',
-      appearance: parsed.profile.appearance === 'day' ? 'day' : 'night',
-      onboardingComplete: Boolean(parsed.profile.onboardingComplete),
-      streamingServices: Array.isArray(parsed.profile.streamingServices) ? parsed.profile.streamingServices.filter((value): value is string => typeof value === 'string') : [],
+      username: typeof profile.username === 'string' ? profile.username.trim().slice(0, 80) || 'Viewer' : 'Viewer',
+      country: typeof profile.country === 'string' && /^[A-Za-z]{2}$/.test(profile.country) ? profile.country.toUpperCase() : 'IN',
+      appearance: profile.appearance === 'day' ? 'day' : 'night',
+      onboardingComplete: Boolean(profile.onboardingComplete),
+      streamingServices: Array.isArray(profile.streamingServices)
+        ? [...new Set(profile.streamingServices.filter((value): value is string => typeof value === 'string').map((value) => value.trim().slice(0, 80)).filter(Boolean))].slice(0, 100)
+        : [],
     },
-    titles: parsed.titles.filter((item): item is UserTitle => Boolean(
-      item &&
-      typeof item.titleId === 'string' &&
-      (item.status === 'watchlist' || item.status === 'watching' || item.status === 'watched') &&
-      typeof item.dateAdded === 'string'
-    )).map((item) => ({ ...item })),
+    titles: [...byId.values()],
   };
 }
 
