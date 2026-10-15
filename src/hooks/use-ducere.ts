@@ -100,9 +100,16 @@ export function useDucere() {
     }
 
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (active) void loadSessionData(data.session?.user.id ?? null);
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (active) void loadSessionData(data.session?.user.id ?? null);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        console.error('Ducere: could not restore auth session', error);
+        setDataError('We could not restore your session. Check your connection and sign in again.');
+        setReady(true);
+      });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (active) void loadSessionData(session?.user.id ?? null);
