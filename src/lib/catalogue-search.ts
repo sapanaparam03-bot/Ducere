@@ -51,11 +51,12 @@ const mapTvMazeResult = (entry: TvMazeSearchEntry): Title | null => {
     director: 'TVmaze',
     seasons: undefined,
     episodes: undefined,
-    providers: [{
-      name: 'TVmaze source',
-      kind: 'info',
+    providers: [],
+    source: {
+      name: 'TVmaze',
       url: show.url ?? `https://www.tvmaze.com/shows/${show.id}`,
-    }, ...(broadcaster ? [{ name: broadcaster, kind: 'info' as const }] : [])],
+      license: 'CC BY-SA',
+    },
   };
 };
 
