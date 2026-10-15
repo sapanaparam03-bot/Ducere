@@ -7,7 +7,7 @@ export type Title = {
   id: string; name: string; type: TitleType; poster: string; backdrop: string;
   description: string; releaseYear: number; genres: string[]; rating: number;
   runtime: string; cast: string[]; director: string; seasons?: number; episodes?: number;
-  providers: Provider[];
+  providers: Provider[]; source?: { name: string; url: string; license?: string };
 };
 export type UserTitle = {
   titleId: string; status: UserStatus; dateAdded: string; dateWatched?: string;
