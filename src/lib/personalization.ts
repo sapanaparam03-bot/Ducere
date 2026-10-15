@@ -84,13 +84,6 @@ export function getAchievements(userTitles: UserTitle[], catalog: Title[]): Achi
   const types = new Set(watched.map((item) => titleById.get(item.titleId)?.type).filter(Boolean));
   const uniqueGenres = new Set(watched.flatMap((item) => titleById.get(item.titleId)?.genres ?? []));
 
-
-  const watched = userTitles.filter((item) => item.status === 'watched');
-  const watching = userTitles.filter((item) => item.status === 'watching');
-  const rated = userTitles.filter((item) => item.rating);
-  const types = new Set(watched.map((item) => catalog.find((title) => title.id === item.titleId)?.type).filter(Boolean));
-  const uniqueGenres = new Set(watched.flatMap((item) => catalog.find((title) => title.id === item.titleId)?.genres ?? []));
-
   return [
     { id: 'first-watch', title: 'First screening', description: 'Complete your first title.', unlocked: watched.length >= 1 },
     { id: 'five-watched', title: 'Five to remember', description: 'Complete five titles.', unlocked: watched.length >= 5 },
