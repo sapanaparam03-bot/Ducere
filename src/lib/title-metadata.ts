@@ -101,7 +101,7 @@ const tvMazeImage = async (title: Title) => {
   const query = encodeURIComponent(title.name);
   const results = await fetchWithTimeout<TvMazeSearchResult[]>(`https://api.tvmaze.com/search/shows?q=${query}`);
   // A first-result fallback can attach a different show’s artwork to this title.
-  const exact = findExactNameMatch(results, (entry) => entry.show?.name, title.name, title.releaseYear, (entry) => { const year = entry.show?.premiered?.slice(0, 4); return year && /^\\d{4}$/.test(year) ? Number(year) : undefined; });
+  const exact = findExactNameMatch(results, (entry) => entry.show?.name, title.name, title.releaseYear, (entry) => { const year = entry.show?.premiered?.slice(0, 4); return year && /^\d{4}$/.test(year) ? Number(year) : undefined; });
   return exact?.show?.image?.original ?? exact?.show?.image?.medium ?? null;
 };
 
@@ -110,7 +110,7 @@ const tvMazeSeasons = async (title: Title) => {
   let showId = id;
   if (!showId) {
     const results = await fetchWithTimeout<TvMazeSearchResult[]>(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(title.name)}`);
-    showId = findExactNameMatch(results, (entry) => entry.show?.name, title.name, title.releaseYear, (entry) => { const year = entry.show?.premiered?.slice(0, 4); return year && /^\\d{4}$/.test(year) ? Number(year) : undefined; })?.show?.id?.toString();
+    showId = findExactNameMatch(results, (entry) => entry.show?.name, title.name, title.releaseYear, (entry) => { const year = entry.show?.premiered?.slice(0, 4); return year && /^\d{4}$/.test(year) ? Number(year) : undefined; })?.show?.id?.toString();
   }
   if (!showId) return {};
 
