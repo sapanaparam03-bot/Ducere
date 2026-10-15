@@ -20,17 +20,21 @@ export function deduplicateCatalogueTitles(titles) {
   const unique = [];
   const seenIds = new Set();
   const seenKeys = new Set();
+  const seenNameTypes = new Set();
+  const seenWildcardKeys = new Set();
   for (const title of titles) {
     if (!title || typeof title.id !== 'string' || seenIds.has(title.id)) continue;
     seenIds.add(title.id);
     const name = normalizeCatalogName(title.name);
     const year = Number(title.releaseYear) || 0;
-    const key = `${title.type}\u0000${name}\u0000${year}`;
-    const wildcardKey = `${title.type}\u0000${name}\u0000*`;
-    if (seenKeys.has(key) || (year && seenKeys.has(wildcardKey))) continue;
-    if (!year && [...seenKeys].some((candidate) => candidate.startsWith(`${title.type}\u0000${name}\u0000`))) continue;
+    const nameTypeKey = String(title.type) + '\u0000' + name;
+    const key = nameTypeKey + '\u0000' + year;
+    const wildcardKey = nameTypeKey + '\u0000*';
+    if (seenKeys.has(key) || (year && seenWildcardKeys.has(wildcardKey))) continue;
+    if (!year && seenNameTypes.has(nameTypeKey)) continue;
     seenKeys.add(key);
-    if (!year) seenKeys.add(wildcardKey);
+    seenNameTypes.add(nameTypeKey);
+    if (!year) seenWildcardKeys.add(wildcardKey);
     unique.push(title);
   }
   return unique;
