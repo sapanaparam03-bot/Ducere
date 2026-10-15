@@ -99,3 +99,65 @@ test('unknown-year duplicates are rejected regardless of which year appears firs
     ['known-first'],
   );
 });
+
+
+test('normal-use simulation: search results from multiple sources merge without duplicate titles', () => {
+  const searchResults = [
+    { id: 'tvmaze-82', name: 'The Bear', type: 'tv', releaseYear: 2022 },
+    { id: 'wikidata-Q123', name: ' the bear ', type: 'tv', releaseYear: 2022 },
+    { id: 'wikidata-Q124', name: 'The Bear', type: 'movie', releaseYear: 2010 },
+    { id: 'wikidata-Q125', name: 'The Bear', type: 'tv', releaseYear: 0 },
+    { id: 'tvmaze-83', name: 'Severance', type: 'tv', releaseYear: 2022 },
+  ];
+  const result = deduplicateCatalogueTitles(searchResults);
+  assert.deepEqual(result.map((title) => title.id), ['tvmaze-82', 'wikidata-Q124', 'tvmaze-83']);
+});
+
+test('usage variation simulation: saved titles survive refreshes and recent search results stay bounded', () => {
+  const builtIns = [{ id: 'built-in-1' }, { id: 'built-in-2' }];
+  const saved = [{ id: 'saved-movie' }, { id: 'saved-anime' }];
+  let current = [...builtIns, ...saved];
+  for (let round = 0; round < 120; round += 1) {
+    const incoming = Array.from({ length: 35 }, (_, index) => ({
+      id: `search-${round}-${index}`,
+      name: `Result ${index % 17}`,
+      type: index % 3 === 0 ? 'anime' : index % 3 === 1 ? 'tv' : 'movie',
+      releaseYear: 2000 + (index % 8),
+    }));
+    current = mergeCatalogueTitles(builtIns, saved, current, incoming, 75);
+    assert.equal(current[0].id, 'built-in-1');
+    assert.equal(current[1].id, 'built-in-2');
+    assert.ok(current.some((title) => title.id === 'saved-movie'));
+    assert.ok(current.some((title) => title.id === 'saved-anime'));
+    assert.ok(current.length <= builtIns.length + saved.length + 75);
+    assert.equal(new Set(current.map((title) => title.id)).size, current.length);
+  }
+});
+
+test('edge-case simulation: malformed catalogue entries do not break deduplication', () => {
+  const result = deduplicateCatalogueTitles([
+    null,
+    undefined,
+    {},
+    { id: 12, name: 'Wrong ID type', type: 'movie', releaseYear: 2020 },
+    { id: 'valid-1', name: 'Arrival', type: 'movie', releaseYear: 2016 },
+    { id: 'valid-1', name: 'Duplicate identifier', type: 'tv', releaseYear: 2021 },
+    { id: 'valid-2', name: 'Arrival', type: 'movie', releaseYear: 2016 },
+    { id: 'valid-3', name: 'Arrival', type: 'movie', releaseYear: 0 },
+  ]);
+  assert.deepEqual(result.map((title) => title.id), ['valid-1']);
+});
+
+test('stress simulation: a large incoming batch keeps memory bounded and selected titles retained', () => {
+  const base = [{ id: 'home-featured' }];
+  const selected = [{ id: 'my-watchlist-1' }, { id: 'my-watchlist-2' }];
+  const current = [...base, ...selected];
+  const incoming = Array.from({ length: 25_000 }, (_, index) => ({ id: `stress-${index}` }));
+  const result = mergeCatalogueTitles(base, selected, current, incoming, 400);
+  assert.equal(result.length, 403);
+  assert.equal(result[0].id, 'home-featured');
+  assert.ok(result.some((title) => title.id === 'my-watchlist-1'));
+  assert.ok(result.some((title) => title.id === 'my-watchlist-2'));
+  assert.equal(result.at(-1).id, 'stress-24999');
+  assert.equal(new Set(result.map((title) => title.id)).size, result.length);
+});
