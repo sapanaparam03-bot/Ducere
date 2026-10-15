@@ -101,7 +101,7 @@ function DucereApp() {
     return <ProfileSetup profile={ducere.profile} onSave={ducere.updateProfile} />;
   }
 
-  const shared = { ...ducere, catalog: liveCatalog.titles, catalogLoading: liveCatalog.loading, catalogError: liveCatalog.error, catalogSearch: liveCatalog.search, catalogSearching: liveCatalog.searching, catalogRetain: liveCatalog.retain };
+  const shared = { ...ducere, catalog: liveCatalog.titles, catalogLoading: liveCatalog.loading, catalogError: liveCatalog.error, catalogSearch: liveCatalog.search, catalogSearching: liveCatalog.searching, catalogCancel: liveCatalog.cancelSearch, catalogRetain: liveCatalog.retain };
   return (
     <div className="film-grain app-shell min-h-[100dvh]">
       <Shell profileName={ducere.profile.username} counts={ducere.counts} onSignOut={() => void supabase?.auth.signOut()} />
@@ -221,6 +221,7 @@ type DucereProps = ReturnType<typeof useDucere> & {
   catalogError?: string | null;
   catalogSearch?: (query: string, type?: 'all' | TitleType) => Promise<Title[]>;
   catalogSearching?: boolean;
+  catalogCancel?: () => void;
   catalogRetain?: (title: Title) => void;
 };
 
@@ -439,17 +440,21 @@ function DiscoverPage({ userTitles, setStatus }: DucereProps) {
   return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12"><PageIntro eyebrow="Discover" title="Find your next film." description="A handpicked shelf of movies, series, and anime. Search by title or mood." /><div className="mb-10 flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777989]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search titles; missing series are looked up live" className="h-12 w-full rounded-xl border border-[#303345] bg-[#171a27] pl-11 pr-4 text-sm outline-none placeholder:text-[#686a7a] focus:border-[#d17459]" data-testid="input-discover-search" /></div><div className="flex gap-2">{(['all', 'movie', 'tv', 'anime'] as const).map((filter) => <button key={filter} onClick={() => setType(filter)} className={`rounded-xl px-4 py-2 text-[11px] font-bold capitalize transition ${type === filter ? 'bg-[#e47a58] text-[#211923]' : 'border border-[#303345] text-[#9495a3] hover:border-[#765045]'}`} data-testid={`button-filter-${filter}`}>{filter === 'all' ? 'Everything' : filter === 'tv' ? 'Series' : filter}</button>)}</div></div><div className="mb-5 flex items-center justify-between"><p className="text-xs text-[#777989]"><span className="font-bold text-[#e2d8c8]">{results.length}</span> titles in the archive</p><button className="flex items-center gap-2 text-[11px] font-semibold text-[#8d8f9f]" data-testid="button-discover-sort"><SlidersHorizontal size={14} /> Curated order</button></div>{results.length ? <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{results.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}</div>;
 }
 
-function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalogError, catalogSearch, catalogSearching, catalogRetain }: DucereProps) {
+function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalogError, catalogSearch, catalogSearching, catalogCancel, catalogRetain }: DucereProps) {
   const query = new URLSearchParams(window.location.search).get('q') ?? '';
   const [search, setSearch] = useState(query);
   const [type, setType] = useState<'all' | TitleType>('all');
   const [visibleCount, setVisibleCount] = useState(144);
   useEffect(() => setVisibleCount(144), [search, type]);
   useEffect(() => {
+    catalogCancel?.();
     if (!catalogSearch || search.trim().length < 2) return;
-    const timer = window.setTimeout(() => { void catalogSearch(search, type); }, 500);
-    return () => window.clearTimeout(timer);
-  }, [catalogSearch, search, type]);
+    const timer = window.setTimeout(() => { void catalogSearch(search, type); }, 400);
+    return () => {
+      window.clearTimeout(timer);
+      catalogCancel?.();
+    };
+  }, [catalogCancel, catalogSearch, search, type]);
   const results = useMemo(
     () => catalog.filter((title) => (type === 'all' || title.type === type) && `${title.name} ${title.genres.join(' ')} ${title.description}`.toLowerCase().includes(search.toLowerCase())),
     [catalog, search, type],
