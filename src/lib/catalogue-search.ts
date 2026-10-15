@@ -113,23 +113,27 @@ async function fetchJson<T>(url: string, signal: AbortSignal, wikidata = false):
   return response.json() as Promise<T>;
 }
 
-async function withTimeout<T>(request: (signal: AbortSignal) => Promise<T>): Promise<T> {
+async function withTimeout<T>(request: (signal: AbortSignal) => Promise<T>, parentSignal?: AbortSignal): Promise<T> {
   const controller = new AbortController();
+  const abortFromParent = () => controller.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) controller.abort(parentSignal.reason);
+  else parentSignal?.addEventListener('abort', abortFromParent, { once: true });
   const timeout = window.setTimeout(() => controller.abort(), 7000);
   try {
     return await request(controller.signal);
   } finally {
     window.clearTimeout(timeout);
+    parentSignal?.removeEventListener('abort', abortFromParent);
   }
 }
 
-async function searchTvMaze(query: string): Promise<Title[]> {
+async function searchTvMaze(query: string, signal: AbortSignal): Promise<Title[]> {
   const url = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`;
-  const entries = await withTimeout((signal) => fetchJson<TvMazeSearchEntry[]>(url, signal));
+  const entries = await withTimeout((requestSignal) => fetchJson<TvMazeSearchEntry[]>(url, requestSignal), signal);
   return entries.map(mapTvMazeResult).filter((title): title is Title => Boolean(title)).slice(0, 20);
 }
 
-async function searchWikidata(query: string, type: 'all' | TitleType): Promise<Title[]> {
+async function searchWikidata(query: string, type: 'all' | TitleType, signal: AbortSignal): Promise<Title[]> {
   const params = new URLSearchParams({
     action: 'wbsearchentities',
     search: query,
@@ -141,11 +145,18 @@ async function searchWikidata(query: string, type: 'all' | TitleType): Promise<T
     origin: '*',
   });
   const url = `https://www.wikidata.org/w/api.php?${params.toString()}`;
-  const result = await withTimeout((signal) => fetchJson<WikidataSearchResponse>(url, signal, true));
+  const result = await withTimeout((requestSignal) => fetchJson<WikidataSearchResponse>(url, requestSignal, true), signal);
   return (result.search ?? [])
     .map((entry) => mapWikidataResult(entry, type))
     .filter((title): title is Title => Boolean(title))
     .slice(0, 20);
+}
+
+let activeSearchController: AbortController | null = null;
+
+export function cancelExternalCatalogueSearch() {
+  activeSearchController?.abort();
+  activeSearchController = null;
 }
 
 /**
@@ -157,32 +168,40 @@ export async function searchExternalCatalogue(query: string, type: 'all' | Title
   const normalized = query.trim();
   if (normalized.length < 2) return [];
 
-  const [seriesResult, wikidataResult] = await Promise.allSettled([
-    type === 'all' || type === 'tv' ? searchTvMaze(normalized) : Promise.resolve([] as Title[]),
-    searchWikidata(normalized, type),
-  ]);
+  cancelExternalCatalogueSearch();
+  const controller = new AbortController();
+  activeSearchController = controller;
+  try {
+    const [seriesResult, wikidataResult] = await Promise.allSettled([
+      type === 'all' || type === 'tv' ? searchTvMaze(normalized, controller.signal) : Promise.resolve([] as Title[]),
+      searchWikidata(normalized, type, controller.signal),
+    ]);
 
-  const titles = [
-    ...(seriesResult.status === 'fulfilled' ? seriesResult.value : []),
-    ...(wikidataResult.status === 'fulfilled' ? wikidataResult.value : []),
-  ];
-  const unique: Title[] = [];
-  const seenIds = new Set<string>();
-  for (const title of titles) {
-    if (seenIds.has(title.id)) continue;
-    seenIds.add(title.id);
-    const normalizedName = title.name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    const duplicate = unique.some((existing) => {
-      if (existing.type !== title.type) return false;
-      const existingName = existing.name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-      return existingName === normalizedName &&
-        (!existing.releaseYear || !title.releaseYear || existing.releaseYear === title.releaseYear);
-    });
-    if (!duplicate) unique.push(title);
-  }
+    const titles = [
+      ...(seriesResult.status === 'fulfilled' ? seriesResult.value : []),
+      ...(wikidataResult.status === 'fulfilled' ? wikidataResult.value : []),
+    ];
+    const unique: Title[] = [];
+    const seenIds = new Set<string>();
+    for (const title of titles) {
+      if (seenIds.has(title.id)) continue;
+      seenIds.add(title.id);
+      const normalizedName = title.name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      const duplicate = unique.some((existing) => {
+        if (existing.type !== title.type) return false;
+        const existingName = existing.name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        return existingName === normalizedName &&
+          (!existing.releaseYear || !title.releaseYear || existing.releaseYear === title.releaseYear);
+      });
+      if (!duplicate) unique.push(title);
+    }
 
-  if (unique.length === 0 && seriesResult.status === 'rejected' && wikidataResult.status === 'rejected') {
-    throw new Error('Catalogue search is temporarily unavailable. Please try again.');
+    if (controller.signal.aborted) throw new DOMException('Search cancelled', 'AbortError');
+    if (unique.length === 0 && seriesResult.status === 'rejected' && wikidataResult.status === 'rejected') {
+      throw new Error('Catalogue search is temporarily unavailable. Please try again.');
+    }
+    return unique.slice(0, 30);
+  } finally {
+    if (activeSearchController === controller) activeSearchController = null;
   }
-  return unique.slice(0, 30);
 }
