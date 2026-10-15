@@ -141,10 +141,16 @@ export function useDucere() {
 
   const persist = useCallback(async (item: UserTitle) => {
     if (!userId || !supabase) return;
-    const { error } = await supabase.from('user_titles').upsert(toDb(userId, item), { onConflict: 'user_id,title_id' });
-    if (error) {
-      console.error('Ducere: failed to save title', error);
-      setDataError('Some changes could not be saved. Please retry.');
+    try {
+      const { error } = await supabase.from('user_titles').upsert(toDb(userId, item), { onConflict: 'user_id,title_id' });
+      if (error) {
+        console.error('Ducere: failed to save title', error);
+        setDataError('Some changes could not be saved. Please retry.');
+      }
+    } catch (error) {
+      // Network failures may reject the request instead of returning a Supabase error.
+      console.error('Ducere: title save request failed', error);
+      setDataError('We could not reach the server. Your local archive is still available.');
     }
   }, [userId]);
 
@@ -241,19 +247,24 @@ export function useDucere() {
     setProfile((current) => {
       const next = { ...current, ...patch };
       if (userId && supabase) {
-        void supabase.from('profiles').upsert({
-          id: userId,
-          username: next.username,
-          country: next.country,
-          appearance: next.appearance,
-          onboarding_complete: next.onboardingComplete,
-          streaming_services: next.streamingServices,
-          updated_at: new Date().toISOString(),
-        }).then(({ error }) => {
+        void Promise.resolve(
+          supabase.from('profiles').upsert({
+            id: userId,
+            username: next.username,
+            country: next.country,
+            appearance: next.appearance,
+            onboarding_complete: next.onboardingComplete,
+            streaming_services: next.streamingServices,
+            updated_at: new Date().toISOString(),
+          }),
+        ).then(({ error }) => {
           if (error) {
             console.error('Ducere: failed to save profile', error);
             setDataError('Some profile changes could not be saved. Please retry.');
           }
+        }).catch((error: unknown) => {
+          console.error('Ducere: profile save request failed', error);
+          setDataError('We could not reach the server. Your local profile is still available.');
         });
       }
       return next;
