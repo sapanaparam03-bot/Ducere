@@ -179,35 +179,37 @@ export function useDucere() {
 
   const remove = useCallback((titleId: string) => {
     const removedItem = userTitles.find((item) => item.titleId === titleId);
+    const removalUserId = userId;
+    const removalSessionId = sessionRequestId.current;
+    const restoreIfSameSession = (message: string) => {
+      // A late response from an old account must never restore its title into a new account.
+      if (sessionRequestId.current !== removalSessionId || userId !== removalUserId) return;
+      setDataError(message);
+      if (removedItem) {
+        setUserTitles((current) => current.some((item) => item.titleId === titleId)
+          ? current
+          : [...current, removedItem]);
+      }
+    };
     const pendingSave = saveTimers.current.get(titleId);
     if (pendingSave) clearTimeout(pendingSave);
     saveTimers.current.delete(titleId);
     setUserTitles((current) => current.filter((item) => item.titleId !== titleId));
-    if (userId && supabase) {
+    if (removalUserId && supabase) {
       void supabase
         .from('user_titles')
         .delete()
-        .eq('user_id', userId)
+        .eq('user_id', removalUserId)
         .eq('title_id', titleId)
         .then(({ error }) => {
           if (error) {
             console.error('Ducere: failed to remove title', error);
-            setDataError('Some changes could not be saved. Please retry.');
-            if (removedItem) {
-              setUserTitles((current) => current.some((item) => item.titleId === titleId)
-                ? current
-                : [...current, removedItem]);
-            }
+            restoreIfSameSession('Some changes could not be saved. Please retry.');
           }
         })
         .catch((error: unknown) => {
           console.error('Ducere: remove request failed', error);
-          setDataError('We could not reach the server. Your title was restored locally.');
-          if (removedItem) {
-            setUserTitles((current) => current.some((item) => item.titleId === titleId)
-              ? current
-              : [...current, removedItem]);
-          }
+          restoreIfSameSession('We could not reach the server. Your title was restored locally.');
         });
     }
   }, [userId, userTitles]);
