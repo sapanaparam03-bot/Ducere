@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     // return no result rather than falsely labeling another release as verified.
     const exact = year > 0
       ? exactCandidates.find((candidate) => candidate.year === year) ??
-        exactCandidates.find((candidate) => !candidate.year)
+        (exactCandidates.some((candidate) => Number(candidate.year) > 0) ? undefined : exactCandidates[0])
       : exactCandidates[0];
 
     if (!exact?.id) {
