@@ -320,14 +320,15 @@ export function useDucere() {
 
   const deleteAccount = useCallback(async () => {
     if (!userId || !supabase) throw new Error('Account deletion is not available.');
-    let result: { error: Error | null };
+    let deletionError: unknown = null;
     try {
-      result = await supabase.functions.invoke('delete-account', { body: {} });
+      const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+      deletionError = error;
     } catch (error) {
       console.error('Ducere: account deletion request failed', error);
       throw new Error('Could not reach the account deletion service. Please try again.');
     }
-    if (result.error) throw new Error('Account deletion failed. Please try again.');
+    if (deletionError) throw new Error('Account deletion failed. Please try again.');
 
     // The server has deleted the account; browser storage cleanup must not misreport that result.
     try {
