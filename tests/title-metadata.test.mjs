@@ -31,3 +31,13 @@ test('exact metadata matching safely handles empty names and no results', () => 
   assert.equal(metadata.findExactNameMatch([], (item) => item.name, 'Missing'), undefined);
   assert.equal(metadata.findExactNameMatch([{ name: 'Example' }], (item) => item.name, '   '), undefined);
 });
+
+test('exact metadata matching uses release year to disambiguate same-name adaptations', () => {
+  const candidates = [
+    { name: 'The Office', premiered: '2001-07-09', id: 'uk' },
+    { name: 'The Office', premiered: '2005-03-24', id: 'us' },
+  ];
+  const yearOf = (item) => Number(item.premiered.slice(0, 4));
+  assert.equal(metadata.findExactNameMatch(candidates, (item) => item.name, 'The Office', 2005, yearOf)?.id, 'us');
+  assert.equal(metadata.findExactNameMatch(candidates, (item) => item.name, 'The Office', 2010, yearOf), undefined);
+});
