@@ -15,7 +15,12 @@ export type ImportSummary = {
   message: string;
 };
 
-const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const normalize = (value: string) => value
+  .normalize('NFKD')
+  .replace(/[\\u0300-\\u036f]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
 
 const parseCsv = (text: string): Record<string, string>[] => {
   const rows: string[][] = [];
