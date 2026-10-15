@@ -272,11 +272,12 @@ export function useDucere() {
   }, [userId]);
 
   const resetData = useCallback(async () => {
+    let profileResetFailed = false;
     if (userId && supabase) {
       try {
-        const { error } = await supabase.from('user_titles').delete().eq('user_id', userId);
-        if (error) {
-          console.error('Ducere: failed to reset archive', error);
+        const { error: titlesError } = await supabase.from('user_titles').delete().eq('user_id', userId);
+        if (titlesError) {
+          console.error('Ducere: failed to reset archive', titlesError);
           setDataError('Your archive could not be reset. Please try again.');
           return;
         }
@@ -285,12 +286,36 @@ export function useDucere() {
         setDataError('We could not reach the server, so your archive was not reset. Please try again.');
         return;
       }
+
+      try {
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: userId,
+          username: INITIAL_PROFILE.username,
+          country: INITIAL_PROFILE.country,
+          appearance: INITIAL_PROFILE.appearance,
+          onboarding_complete: INITIAL_PROFILE.onboardingComplete,
+          streaming_services: INITIAL_PROFILE.streamingServices,
+          updated_at: new Date().toISOString(),
+        });
+        if (profileError) {
+          profileResetFailed = true;
+          console.error('Ducere: archive cleared but profile reset failed', profileError);
+        }
+      } catch (error) {
+        profileResetFailed = true;
+        console.error('Ducere: archive cleared but profile reset request failed', error);
+      }
     }
+
     saveTimers.current.forEach((timer) => clearTimeout(timer));
     saveTimers.current.clear();
     setUserTitles([]);
-    setProfile(INITIAL_PROFILE);
-    setDataError(null);
+    if (!profileResetFailed) {
+      setProfile(INITIAL_PROFILE);
+      setDataError(null);
+    } else {
+      setDataError('Your saved titles were cleared, but profile settings could not be reset. Please try again.');
+    }
   }, [userId]);
 
   const deleteAccount = useCallback(async () => {
