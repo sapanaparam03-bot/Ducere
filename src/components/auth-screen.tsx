@@ -18,41 +18,47 @@ export function AuthScreen() {
     setBusy(true);
     setMessage('');
 
-    if (mode === 'signup') {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { emailRedirectTo: window.location.origin },
-      });
-      if (error) {
-        const normalized = error.message.toLowerCase();
-        if (error.status === 429 || normalized.includes('rate limit') || normalized.includes('rate exceeded')) {
-          setMessage('Supabase has temporarily rate-limited confirmation emails. Your signup may already exist; check your inbox/spam before trying again.');
-        } else if (normalized.includes('already registered')) {
-          setMessage('This email is already registered. Switch to Sign in.');
+    try {
+      if (mode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        if (error) {
+          const normalized = error.message.toLowerCase();
+          if (error.status === 429 || normalized.includes('rate limit') || normalized.includes('rate exceeded')) {
+            setMessage('Supabase has temporarily rate-limited confirmation emails. Your signup may already exist; check your inbox/spam before trying again.');
+          } else if (normalized.includes('already registered')) {
+            setMessage('This email is already registered. Switch to Sign in.');
+          } else {
+            setMessage(error.message);
+          }
+        } else if (!data.session) {
+          setMessage('Account created. Check your email to confirm your account, then sign in.');
         } else {
-          setMessage(error.message);
+          setMessage('Account created. Welcome to Ducere.');
         }
-      } else if (!data.session) {
-        setMessage('Account created. Check your email to confirm your account, then sign in.');
       } else {
-        setMessage('Account created. Welcome to Ducere.');
-      }
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (error) {
-        const normalized = error.message.toLowerCase();
-        if (normalized.includes('email not confirmed')) {
-          setMessage('Your account exists, but the email is not confirmed yet. Check your confirmation email.');
-        } else {
-          setMessage(error.message);
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (error) {
+          const normalized = error.message.toLowerCase();
+          if (normalized.includes('email not confirmed')) {
+            setMessage('Your account exists, but the email is not confirmed yet. Check your confirmation email.');
+          } else {
+            setMessage(error.message);
+          }
         }
       }
+    } catch (error) {
+      console.error('Ducere: authentication request failed', error);
+      setMessage('Could not reach the sign-in service. Check your connection and try again.');
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   return (
