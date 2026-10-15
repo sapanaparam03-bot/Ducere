@@ -17,24 +17,31 @@ const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max,
 
 export function getGenreProfile(userTitles: UserTitle[], catalog: Title[]) {
   const counts = new Map<string, number>();
-  userTitles.filter((item) => item.status !== 'watchlist').forEach((item) => {
-    const title = catalog.find((candidate) => candidate.id === item.titleId);
+  const titleById = new Map(catalog.map((title) => [title.id, title]));
+  for (const item of userTitles) {
+    if (item.status === 'watchlist') continue;
+    const title = titleById.get(item.titleId);
     title?.genres.forEach((genre) => counts.set(genre, (counts.get(genre) ?? 0) + 1));
-  });
+  }
   return counts;
 }
+
+
 
 export function rankRecommendations(userTitles: UserTitle[], catalog: Title[]): RecommendationReason[] {
   const genreProfile = getGenreProfile(userTitles, catalog);
   const maxGenre = Math.max(1, ...genreProfile.values());
   const preferredTypes = new Map<Title['type'], number>();
-  userTitles.filter((item) => item.status !== 'watchlist').forEach((item) => {
-    const title = catalog.find((candidate) => candidate.id === item.titleId);
+  const savedIds = new Set(userTitles.map((item) => item.titleId));
+  const titleById = new Map(catalog.map((title) => [title.id, title]));
+  for (const item of userTitles) {
+    if (item.status === 'watchlist') continue;
+    const title = titleById.get(item.titleId);
     if (title) preferredTypes.set(title.type, (preferredTypes.get(title.type) ?? 0) + 1);
-  });
+  }
 
   return catalog
-    .filter((title) => !userTitles.some((item) => item.titleId === title.id))
+    .filter((title) => !savedIds.has(title.id))
     .map((title) => {
       const genreScore = title.genres.reduce((sum, genre) => sum + ((genreProfile.get(genre) ?? 0) / maxGenre) * 6, 0);
       const typeScore = (preferredTypes.get(title.type) ?? 0) > 0 ? 2 : 0;
@@ -50,9 +57,12 @@ export function rankRecommendations(userTitles: UserTitle[], catalog: Title[]): 
     .sort((a, b) => b.score - a.score || b.title.rating - a.title.rating);
 }
 
+
+
 export function calculateViewingMinutes(userTitles: UserTitle[], catalog: Title[]) {
+  const titleById = new Map(catalog.map((title) => [title.id, title]));
   return userTitles.reduce((total, item) => {
-    const title = catalog.find((candidate) => candidate.id === item.titleId);
+    const title = titleById.get(item.titleId);
     if (!title) return total;
     const progress = clamp(item.progress ?? (item.status === 'watched' ? 100 : 0)) / 100;
     if (title.type === 'movie') {
@@ -64,7 +74,17 @@ export function calculateViewingMinutes(userTitles: UserTitle[], catalog: Title[
   }, 0);
 }
 
+
+
 export function getAchievements(userTitles: UserTitle[], catalog: Title[]): Achievement[] {
+  const titleById = new Map(catalog.map((title) => [title.id, title]));
+  const watched = userTitles.filter((item) => item.status === 'watched');
+  const watching = userTitles.filter((item) => item.status === 'watching');
+  const rated = userTitles.filter((item) => item.rating);
+  const types = new Set(watched.map((item) => titleById.get(item.titleId)?.type).filter(Boolean));
+  const uniqueGenres = new Set(watched.flatMap((item) => titleById.get(item.titleId)?.genres ?? []));
+
+
   const watched = userTitles.filter((item) => item.status === 'watched');
   const watching = userTitles.filter((item) => item.status === 'watching');
   const rated = userTitles.filter((item) => item.rating);
