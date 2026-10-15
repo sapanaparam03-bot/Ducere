@@ -129,8 +129,8 @@ const csvCell = (value: string | number | undefined | null) => {
   const original = String(value ?? '');
   // Spreadsheet applications may execute cells beginning with formula characters.
   // Prefix an apostrophe even when whitespace/control characters precede the formula.
-  const text = /^[\\u0000-\\u0020]*[=+@-]/.test(original) ? `'${original}` : original;
-  return /[",\\n\\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  const text = /^[\u0000-\u0020]*[=+@-]/.test(original) ? `'${original}` : original;
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
 export function downloadDucereCsv(userTitles: UserTitle[], catalog: Title[]) {
@@ -152,7 +152,7 @@ export function downloadDucereCsv(userTitles: UserTitle[], catalog: Title[]) {
     ].join(',');
   });
   // UTF-8 BOM helps spreadsheet applications preserve non-English title/review text.
-  const blob = new Blob(['\\uFEFF', [header.join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob(['\uFEFF', [header.join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -160,12 +160,12 @@ export function downloadDucereCsv(userTitles: UserTitle[], catalog: Title[]) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 const isDateOnly = (value: unknown): value is string =>
   typeof value === 'string' &&
-  /^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+  /^\d{4}-\d{2}-\d{2}$/.test(value) &&
   !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
   new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 
