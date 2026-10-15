@@ -1,4 +1,4 @@
--- Ducere production database. Run this once in Supabase SQL Editor.
+-- Ducere production database. Safe to re-run: schema changes are idempotent.
 create extension if not exists pgcrypto;
 
 create table if not exists public.profiles (
@@ -7,9 +7,14 @@ create table if not exists public.profiles (
   country text not null default 'IN',
   appearance text not null default 'night' check (appearance in ('night','day')),
   onboarding_complete boolean not null default false,
+  streaming_services text[] not null default '{}'::text[],
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Also upgrades projects where profiles was created before streaming preferences existed.
+alter table public.profiles
+  add column if not exists streaming_services text[] not null default '{}'::text[];
 
 create table if not exists public.user_titles (
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -19,8 +24,8 @@ create table if not exists public.user_titles (
   date_watched date,
   rating smallint check (rating between 1 and 5),
   review text,
-  current_season integer,
-  current_episode integer,
+  current_season integer check (current_season is null or current_season >= 1),
+  current_episode integer check (current_episode is null or current_episode >= 1),
   progress numeric(5,2) not null default 0 check (progress between 0 and 100),
   updated_at timestamptz not null default now(),
   primary key (user_id,title_id)
@@ -34,11 +39,18 @@ create policy "profiles own row" on public.profiles for all using (auth.uid() = 
 drop policy if exists "titles own rows" on public.user_titles;
 create policy "titles own rows" on public.user_titles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
+create or replace function public.handle_new_user() returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 begin
-  insert into public.profiles(id, username, onboarding_complete) values (new.id, 'Viewer', false);
+  insert into public.profiles(id, username, onboarding_complete)
+  values (new.id, 'Viewer', false)
+  on conflict (id) do nothing;
   return new;
-end; $$;
+end;
+$$;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
