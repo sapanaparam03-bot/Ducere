@@ -7,7 +7,7 @@ export type SubscriptionProvider = {
 
 export const SUBSCRIPTION_PROVIDERS: SubscriptionProvider[] = [
   { key: 'netflix', name: 'Netflix', aliases: ['netflix'], kind: 'streaming' },
-  { key: 'prime-video', name: 'Prime Video', aliases: ['prime video', 'amazon prime video', 'amazon'], kind: 'streaming' },
+  { key: 'prime-video', name: 'Prime Video', aliases: ['prime video', 'amazon prime video'], kind: 'streaming' },
   { key: 'disney-plus', name: 'Disney+', aliases: ['disney+', 'disney plus'], kind: 'streaming' },
   { key: 'jiohotstar', name: 'JioHotstar', aliases: ['jiohotstar', 'hotstar'], kind: 'streaming' },
   { key: 'crunchyroll', name: 'Crunchyroll', aliases: ['crunchyroll'], kind: 'streaming' },
@@ -24,5 +24,5 @@ export const SUBSCRIPTION_PROVIDERS: SubscriptionProvider[] = [
 
 export const providerKeyForName = (name: string) => {
   const normalized = name.toLowerCase().replace(/\s+/g, ' ').trim();
-  return SUBSCRIPTION_PROVIDERS.find((provider) => provider.aliases.some((alias) => normalized.includes(alias)))?.key;
+  return SUBSCRIPTION_PROVIDERS.find((provider) => provider.aliases.some((alias) => normalized === alias))?.key;
 };
