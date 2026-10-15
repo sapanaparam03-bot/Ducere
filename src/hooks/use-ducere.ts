@@ -196,21 +196,21 @@ export function useDucere() {
     saveTimers.current.delete(titleId);
     setUserTitles((current) => current.filter((item) => item.titleId !== titleId));
     if (removalUserId && supabase) {
-      void supabase
-        .from('user_titles')
-        .delete()
-        .eq('user_id', removalUserId)
-        .eq('title_id', titleId)
-        .then(({ error }) => {
-          if (error) {
-            console.error('Ducere: failed to remove title', error);
-            restoreIfSameSession('Some changes could not be saved. Please retry.');
-          }
-        })
-        .catch((error: unknown) => {
-          console.error('Ducere: remove request failed', error);
-          restoreIfSameSession('We could not reach the server. Your title was restored locally.');
-        });
+      void Promise.resolve(
+        supabase
+          .from('user_titles')
+          .delete()
+          .eq('user_id', removalUserId)
+          .eq('title_id', titleId),
+      ).then(({ error }) => {
+        if (error) {
+          console.error('Ducere: failed to remove title', error);
+          restoreIfSameSession('Some changes could not be saved. Please retry.');
+        }
+      }).catch((error: unknown) => {
+        console.error('Ducere: remove request failed', error);
+        restoreIfSameSession('We could not reach the server. Your title was restored locally.');
+      });
     }
   }, [userId, userTitles]);
 
