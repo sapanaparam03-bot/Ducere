@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TITLES, type Title, type TitleType } from '@/lib/ducere';
 import { loadLiveCatalog } from '@/lib/live-catalog';
-import { searchExternalCatalogue } from '@/lib/catalogue-search';
+import { cancelExternalCatalogueSearch, searchExternalCatalogue } from '@/lib/catalogue-search';
 
 const SELECTED_TITLES_KEY = 'ducere-selected-catalogue-v1';
 
@@ -91,6 +91,7 @@ export function useCatalog() {
 
   const cancelSearch = useCallback(() => {
     requestId.current += 1;
+    cancelExternalCatalogueSearch();
     setSearching(false);
   }, []);
 
