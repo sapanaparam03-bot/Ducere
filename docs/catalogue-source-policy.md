@@ -5,7 +5,7 @@
 - The built-in curated shelf remains the immediate fallback and works without external catalogue services.
 - Series are searched on demand through TVmaze's public search endpoint. TVmaze states that its API is licensed under CC BY-SA and allows commercial use when attribution and ShareAlike requirements are met; search results link back to TVmaze. Before server-side persistence, we must review how ShareAlike applies to Ducere's database and presentation.
 - Films, TV, and anime are also searched on demand through Wikidata's structured data, which is released under CC0. Results use a generated poster fallback rather than copying image files from Wikidata; the detail page links to the Wikidata item.
-- Neither provider is crawled in bulk at app startup, and the current search module does not persist external responses to browser storage or Supabase.
+- Neither provider is crawled in bulk at app startup. Search responses are held in memory; only when a user adds a returned title to their library is that selected title's metadata saved in that user's browser storage, together with its source URL/license, so the item can still be displayed after reload. This is not a shared server-side catalogue import.
 
 ## Do not do
 
