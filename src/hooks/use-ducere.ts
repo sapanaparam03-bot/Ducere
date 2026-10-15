@@ -320,11 +320,24 @@ export function useDucere() {
 
   const deleteAccount = useCallback(async () => {
     if (!userId || !supabase) throw new Error('Account deletion is not available.');
-    const { error } = await supabase.functions.invoke('delete-account', { body: {} });
-    if (error) throw new Error('Account deletion failed. Please try again.');
-    localStorage.removeItem(`${USER_KEY}:${userId}`);
-    localStorage.removeItem(`${PROFILE_KEY}:${userId}`);
-    await supabase.auth.signOut();
+    let result: { error: Error | null };
+    try {
+      result = await supabase.functions.invoke('delete-account', { body: {} });
+    } catch (error) {
+      console.error('Ducere: account deletion request failed', error);
+      throw new Error('Could not reach the account deletion service. Please try again.');
+    }
+    if (result.error) throw new Error('Account deletion failed. Please try again.');
+
+    // The server has deleted the account; browser storage cleanup must not misreport that result.
+    try {
+      localStorage.removeItem(`${USER_KEY}:${userId}`);
+      localStorage.removeItem(`${PROFILE_KEY}:${userId}`);
+    } catch (error) {
+      console.warn('Ducere: account deleted but local backup cleanup was blocked', error);
+    }
+    const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+    if (signOutError) console.error('Ducere: account deleted but local sign-out reported an error', signOutError);
   }, [userId]);
 
   const counts = useMemo(() => ({
