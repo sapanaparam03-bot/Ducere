@@ -48,5 +48,7 @@ export function mergeCatalogueTitles(baseTitles, selectedTitles, currentTitles, 
   const selectedIds = new Set(selectedTitles.map((title) => title.id));
   const retained = [...byId.values()].filter((title) => !baseIds.has(title.id) && selectedIds.has(title.id));
   const recent = [...byId.values()].filter((title) => !baseIds.has(title.id) && !selectedIds.has(title.id));
-  return [...baseTitles, ...retained, ...recent.slice(-Math.max(0, maxRecent))];
+  const recentLimit = Math.max(0, Math.floor(maxRecent));
+  const boundedRecent = recentLimit === 0 ? [] : recent.slice(-recentLimit);
+  return [...baseTitles, ...retained, ...boundedRecent];
 }
