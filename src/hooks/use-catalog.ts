@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { TITLES, type Title } from '@/lib/ducere';
 import { loadLiveCatalog } from '@/lib/live-catalog';
-import { searchExternalSeries } from '@/lib/catalogue-search';
+import { searchExternalCatalogue } from '@/lib/catalogue-search';
 
 const mergeTitles = (current: Title[], incoming: Title[]) => {
   const seen = new Set(current.map((title) => title.id));
@@ -29,13 +29,13 @@ export function useCatalog() {
     return () => { active = false; };
   }, []);
 
-  const search = useCallback(async (query: string) => {
+  const search = useCallback(async (query: string, type: 'all' | import('@/lib/ducere').TitleType = 'all') => {
     const normalized = query.trim();
     if (normalized.length < 2) return [];
     setSearching(true);
     setError(null);
     try {
-      const results = await searchExternalSeries(normalized);
+      const results = await searchExternalCatalogue(normalized, type);
       setTitles((current) => mergeTitles(current, results));
       return results;
     } catch (cause) {
