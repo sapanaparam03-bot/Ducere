@@ -69,3 +69,33 @@ test('a zero recent-cache limit retains only built-in and selected titles', () =
   const result = mergeCatalogueTitles([{ id: 'base' }], [{ id: 'saved' }], [{ id: 'base' }, { id: 'saved' }, { id: 'old' }], [{ id: 'new' }], 0);
   assert.deepEqual(result.map((item) => item.id), ['base', 'saved']);
 });
+
+
+test('deduplicates large batches with unknown years without quadratic key scans', () => {
+  const titles = Array.from({ length: 10_000 }, (_, index) => ({
+    id: 'unknown-year-' + index,
+    name: 'Title ' + index,
+    type: 'movie',
+    releaseYear: 0,
+  }));
+  const result = deduplicateCatalogueTitles(titles);
+  assert.equal(result.length, 10_000);
+  assert.equal(result.at(-1).id, 'unknown-year-9999');
+});
+
+test('unknown-year duplicates are rejected regardless of which year appears first', () => {
+  assert.deepEqual(
+    deduplicateCatalogueTitles([
+      { id: 'unknown-first', name: 'Example', type: 'movie', releaseYear: 0 },
+      { id: 'known-later', name: 'Example', type: 'movie', releaseYear: 2022 },
+    ]).map((item) => item.id),
+    ['unknown-first'],
+  );
+  assert.deepEqual(
+    deduplicateCatalogueTitles([
+      { id: 'known-first', name: 'Example', type: 'movie', releaseYear: 2022 },
+      { id: 'unknown-later', name: 'Example', type: 'movie', releaseYear: 0 },
+    ]).map((item) => item.id),
+    ['known-first'],
+  );
+});
