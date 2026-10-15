@@ -101,7 +101,7 @@ function DucereApp() {
     return <ProfileSetup profile={ducere.profile} onSave={ducere.updateProfile} />;
   }
 
-  const shared = { ...ducere, catalog: liveCatalog.titles, catalogLoading: liveCatalog.loading, catalogError: liveCatalog.error, catalogSearch: liveCatalog.search, catalogSearching: liveCatalog.searching };
+  const shared = { ...ducere, catalog: liveCatalog.titles, catalogLoading: liveCatalog.loading, catalogError: liveCatalog.error, catalogSearch: liveCatalog.search, catalogSearching: liveCatalog.searching, catalogRetain: liveCatalog.retain };
   return (
     <div className="film-grain app-shell min-h-[100dvh]">
       <Shell profileName={ducere.profile.username} counts={ducere.counts} onSignOut={() => void supabase?.auth.signOut()} />
@@ -221,6 +221,7 @@ type DucereProps = ReturnType<typeof useDucere> & {
   catalogError?: string | null;
   catalogSearch?: (query: string, type?: 'all' | TitleType) => Promise<Title[]>;
   catalogSearching?: boolean;
+  catalogRetain?: (title: Title) => void;
 };
 
 const findTitle = (catalog: Title[], id: string) => catalog.find((title) => title.id === id) ?? titleById(id);
@@ -438,7 +439,7 @@ function DiscoverPage({ userTitles, setStatus }: DucereProps) {
   return <div className="mx-auto max-w-[1440px] px-5 py-9 sm:px-8 lg:px-12"><PageIntro eyebrow="Discover" title="Find your next film." description="A handpicked shelf of movies, series, and anime. Search by title or mood." /><div className="mb-10 flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777989]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search titles; missing series are looked up live" className="h-12 w-full rounded-xl border border-[#303345] bg-[#171a27] pl-11 pr-4 text-sm outline-none placeholder:text-[#686a7a] focus:border-[#d17459]" data-testid="input-discover-search" /></div><div className="flex gap-2">{(['all', 'movie', 'tv', 'anime'] as const).map((filter) => <button key={filter} onClick={() => setType(filter)} className={`rounded-xl px-4 py-2 text-[11px] font-bold capitalize transition ${type === filter ? 'bg-[#e47a58] text-[#211923]' : 'border border-[#303345] text-[#9495a3] hover:border-[#765045]'}`} data-testid={`button-filter-${filter}`}>{filter === 'all' ? 'Everything' : filter === 'tv' ? 'Series' : filter}</button>)}</div></div><div className="mb-5 flex items-center justify-between"><p className="text-xs text-[#777989]"><span className="font-bold text-[#e2d8c8]">{results.length}</span> titles in the archive</p><button className="flex items-center gap-2 text-[11px] font-semibold text-[#8d8f9f]" data-testid="button-discover-sort"><SlidersHorizontal size={14} /> Curated order</button></div>{results.length ? <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{results.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}</div>;
 }
 
-function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalogError, catalogSearch, catalogSearching }: DucereProps) {
+function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalogError, catalogSearch, catalogSearching, catalogRetain }: DucereProps) {
   const query = new URLSearchParams(window.location.search).get('q') ?? '';
   const [search, setSearch] = useState(query);
   const [type, setType] = useState<'all' | TitleType>('all');
@@ -470,10 +471,10 @@ function DiscoverPageV2({ userTitles, setStatus, catalog, catalogLoading, catalo
       <div className="relative flex-1"><Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#777989]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search titles; missing series are looked up live" className="h-12 w-full rounded-xl border border-[#303345] bg-[#171a27] pl-11 pr-4 text-sm outline-none placeholder:text-[#686a7a] focus:border-[#d17459]" data-testid="input-discover-search" /></div>
       <div className="flex gap-2 overflow-x-auto">{(['all', 'movie', 'tv', 'anime'] as const).map((filter) => <button key={filter} onClick={() => setType(filter)} className={`rounded-xl px-4 py-2 text-[11px] font-bold capitalize transition ${type === filter ? 'bg-[#e47a58] text-[#211923]' : 'border border-[#303345] text-[#9495a3] hover:border-[#765045]'}`} data-testid={`button-filter-${filter}`}>{filter === 'all' ? 'Everything' : filter === 'tv' ? 'Series' : filter}</button>)}</div>
     </div>
-    {!search && type === 'all' && recommendations.length > 0 && <section className="mb-10"><SectionHeading eyebrow="For your taste" title={likedGenres.length ? "Because you watch " + likedGenres[0] : 'A few places to start'} /><div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">{recommendations.map(({ title, reasons }) => <div key={title.id} className="space-y-2"><PosterCard title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />{reasons[0] && <p className="px-1 text-[9px] text-[#777989]">{reasons[0]}</p>}</div>)}</div></section>}
+    {!search && type === 'all' && recommendations.length > 0 && <section className="mb-10"><SectionHeading eyebrow="For your taste" title={likedGenres.length ? "Because you watch " + likedGenres[0] : 'A few places to start'} /><div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">{recommendations.map(({ title, reasons }) => <div key={title.id} className="space-y-2"><PosterCard title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => { catalogRetain?.(title); setStatus(title.id, status); }} />{reasons[0] && <p className="px-1 text-[9px] text-[#777989]">{reasons[0]}</p>}</div>)}</div></section>}
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-[#777989]"><span className="font-bold text-[#e2d8c8]">{results.length}</span> titles indexed{catalogLoading ? ' · loading catalogue' : ''}{catalogSearching ? ' · searching series sources' : ''}</p><span className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#666879]">Curated + on-demand series</span></div>
     {catalogError && <div className="mb-5 rounded-xl border border-[#6a493f] bg-[#31252a] px-4 py-3 text-xs text-[#c6aaa1]">{catalogError}</div>}
-    {visible.length ? <><div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{visible.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => setStatus(title.id, status)} />)}</div>{visible.length < results.length && <div className="flex justify-center py-12"><button onClick={() => setVisibleCount((current) => current + 144)} className="rounded-xl border border-[#6a4038] px-5 py-3 text-xs font-bold text-[#e78b6c] transition hover:bg-[#e47a58]/10" data-testid="button-load-more">Load more titles <span className="ml-1 text-[#9c7f77]">({results.length - visible.length} remaining)</span></button></div>}</> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}
+    {visible.length ? <><div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{visible.map((title) => <PosterCard key={title.id} title={title} userTitle={userTitles.find((item) => item.titleId === title.id)} onStatus={(status) => { catalogRetain?.(title); setStatus(title.id, status); }} />)}</div>{visible.length < results.length && <div className="flex justify-center py-12"><button onClick={() => setVisibleCount((current) => current + 144)} className="rounded-xl border border-[#6a4038] px-5 py-3 text-xs font-bold text-[#e78b6c] transition hover:bg-[#e47a58]/10" data-testid="button-load-more">Load more titles <span className="ml-1 text-[#9c7f77]">({results.length - visible.length} remaining)</span></button></div>}</> : <EmptyState icon={<Search size={23} />} title="Nothing found in this reel" copy="Try a title, genre, or a softer search term." href="/discover" action="Clear search" />}
   </div>;
 }
 
@@ -528,7 +529,7 @@ function TitleDetailsPage(props: DucereProps) {
   return <TitleDetails title={enrichedTitle ?? title} {...props} />;
 }
 
-function TitleDetails({ title, getUserTitle, upsert, setStatus, remove, setEpisodeProgress, profile }: { title: Title } & DucereProps) {
+function TitleDetails({ title, getUserTitle, upsert, setStatus, remove, setEpisodeProgress, profile, catalogRetain }: { title: Title } & DucereProps) {
   const existing = getUserTitle(title.id);
   const [review, setReview] = useState(existing?.review ?? '');
   const [rating, setRating] = useState(existing?.rating ?? 0);
@@ -536,7 +537,7 @@ function TitleDetails({ title, getUserTitle, upsert, setStatus, remove, setEpiso
     ? (existing?.progress ?? 0)
     : seriesProgress(title, existing?.currentSeason ?? 1, existing?.currentEpisode ?? 1) || (existing?.progress ?? 0);
   const status = existing?.status as string | undefined;
-  const setAndKeep = (next: UserStatus) => setStatus(title.id, next);
+  const setAndKeep = (next: UserStatus) => { catalogRetain?.(title); setStatus(title.id, next); };
   return <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-12"><Link href="/discover" className="mb-7 inline-flex items-center gap-2 text-xs font-semibold text-[#898b9b] hover:text-[#e47a58]" data-testid="link-back-discover"><ArrowRight size={14} className="rotate-180" /> Back to discover</Link><section className="relative overflow-hidden rounded-[18px] border border-[#3e3440] bg-[#1a1b29]"><div className="absolute inset-0 bg-cover bg-center opacity-20" style={{ backgroundImage: `url(${title.backdrop})` }} /><div className="absolute inset-0 bg-gradient-to-r from-[#171824] via-[#171824]/95 to-[#171824]/45" /><div className="relative grid gap-8 px-6 py-8 sm:px-10 sm:py-12 lg:grid-cols-[220px_1fr] lg:gap-12"><div className={`mx-auto aspect-[2/3] w-[180px] overflow-hidden rounded-xl bg-gradient-to-br ${typeTint[title.type]} shadow-2xl lg:mx-0 lg:w-full`}><img src={title.poster} alt={`${title.name} poster`} className="h-full w-full object-cover" loading="eager" decoding="async" onError={(event) => {
         const image = event.currentTarget;
         if (image.dataset.fallback === 'cover') return;
