@@ -4,6 +4,7 @@ type TvMazeSearchResult = {
   show?: {
     id: number;
     name?: string;
+    premiered?: string | null;
     image?: { original?: string | null; medium?: string | null } | null;
   };
 };
@@ -78,17 +79,29 @@ export function findExactNameMatch<T>(
   items: T[],
   getName: (item: T) => string | undefined,
   target: string,
+  targetYear?: number,
+  getYear?: (item: T) => number | undefined,
 ): T | undefined {
   const normalizedTarget = normalizeTitle(target);
   if (!normalizedTarget) return undefined;
-  return items.find((item) => normalizeTitle(getName(item) ?? '') === normalizedTarget);
+  const matches = items.filter((item) => normalizeTitle(getName(item) ?? '') === normalizedTarget);
+  if (targetYear && getYear) {
+    const yearMatch = matches.find((item) => {
+      const candidateYear = getYear(item);
+      return candidateYear !== undefined && Math.abs(candidateYear - targetYear) <= 1;
+    });
+    if (yearMatch) return yearMatch;
+    // If the source gives years and none match, do not substitute a different adaptation.
+    if (matches.some((item) => getYear(item) !== undefined)) return undefined;
+  }
+  return matches[0];
 }
 
 const tvMazeImage = async (title: Title) => {
   const query = encodeURIComponent(title.name);
   const results = await fetchWithTimeout<TvMazeSearchResult[]>(`https://api.tvmaze.com/search/shows?q=${query}`);
   // A first-result fallback can attach a different show’s artwork to this title.
-  const exact = findExactNameMatch(results, (entry) => entry.show?.name, title.name);
+  const exact = findExactNameMatch(results, (entry) => entry.show?.name, title.name, title.releaseYear, (entry) => { const year = entry.show?.premiered?.slice(0, 4); return year && /^\\d{4}$/.test(year) ? Number(year) : undefined; });
   return exact?.show?.image?.original ?? exact?.show?.image?.medium ?? null;
 };
 
@@ -97,7 +110,7 @@ const tvMazeSeasons = async (title: Title) => {
   let showId = id;
   if (!showId) {
     const results = await fetchWithTimeout<TvMazeSearchResult[]>(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(title.name)}`);
-    showId = findExactNameMatch(results, (entry) => entry.show?.name, title.name)?.show?.id?.toString();
+    showId = findExactNameMatch(results, (entry) => entry.show?.name, title.name, title.releaseYear, (entry) => { const year = entry.show?.premiered?.slice(0, 4); return year && /^\\d{4}$/.test(year) ? Number(year) : undefined; })?.show?.id?.toString();
   }
   if (!showId) return {};
 
