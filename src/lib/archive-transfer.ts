@@ -60,10 +60,12 @@ const rowToUserTitle = (row: Record<string, string>, catalog: Title[]): UserTitl
 
   const target = normalize(rawName);
   const year = Number(row['year'] || row['release year'] || '');
+  // If the import provides a year, do not silently fall back to a different
+  // adaptation with the same title when no year-compatible match exists.
   const title = catalog.find((candidate) =>
     normalize(candidate.name) === target &&
     (!Number.isFinite(year) || !year || !candidate.releaseYear || Math.abs(candidate.releaseYear - year) <= 1)
-  ) ?? catalog.find((candidate) => normalize(candidate.name) === target);
+  );
 
   if (!title) return null;
 
