@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,20 +25,34 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  const apiKey = Deno.env.get("WATCHMODE_API_KEY");
-  if (!apiKey) {
-    return json({ error: "Availability provider is not configured.", code: "WATCHMODE_NOT_CONFIGURED" }, 503);
-  }
+  const authorization = req.headers.get("Authorization");
+  const token = authorization?.match(/^Bearer\\s+(.+)$/i)?.[1];
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!token || !supabaseUrl || !anonKey) return json({ error: "Authentication required." }, 401);
 
   try {
+    const authClient = createClient(supabaseUrl, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+    if (authError || !user) return json({ error: "Please sign in to check availability." }, 401);
+
+    const apiKey = Deno.env.get("WATCHMODE_API_KEY");
+    if (!apiKey) {
+      return json({ error: "Availability provider is not configured.", code: "WATCHMODE_NOT_CONFIGURED" }, 503);
+    }
+
     const body = await req.json();
     const titleName = String(body?.titleName ?? "").trim();
-    const mediaType = body?.mediaType === "movie" ? "movie" : "tv";
+    const mediaType = body?.mediaType;
     const region = String(body?.region ?? "US").toUpperCase();
     const year = Number(body?.year ?? 0);
 
-    if (!titleName) return json({ error: "titleName is required" }, 400);
+    if (!titleName || titleName.length > 200) return json({ error: "titleName must be between 1 and 200 characters" }, 400);
+    if (mediaType !== "movie" && mediaType !== "tv") return json({ error: "Invalid mediaType" }, 400);
     if (!/^[A-Z]{2}$/.test(region)) return json({ error: "Invalid region" }, 400);
+    if (year !== 0 && (!Number.isInteger(year) || year < 1800 || year > 2200)) return json({ error: "Invalid year" }, 400);
 
     const searchUrl = new URL("https://api.watchmode.com/v1/search/");
     searchUrl.searchParams.set("apiKey", apiKey);
