@@ -82,6 +82,7 @@ function DucereApp() {
     <div className="film-grain app-shell min-h-[100dvh]">
       <Shell profileName={ducere.profile.username} counts={ducere.counts} onSignOut={() => void supabase?.auth.signOut()} />
       <main className="min-h-[100dvh] pb-24 md:ml-[248px] md:pb-0">
+        {ducere.dataError && <div role="alert" className="mx-auto max-w-[1440px] px-5 pt-4 sm:px-8 lg:px-12"><div className="rounded-xl border border-[#6a493f] bg-[#31252a] px-4 py-3 text-xs leading-5 text-[#d7b6a9]">{ducere.dataError}</div></div>}
         <Switch>
           <Route path="/" component={() => <HomePage {...shared} />} />
           <Route path="/discover" component={() => <DiscoverPageV2 {...shared} />} />
