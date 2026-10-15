@@ -273,10 +273,16 @@ export function useDucere() {
 
   const resetData = useCallback(async () => {
     if (userId && supabase) {
-      const { error } = await supabase.from('user_titles').delete().eq('user_id', userId);
-      if (error) {
-        console.error('Ducere: failed to reset archive', error);
-        setDataError('Your archive could not be reset. Please try again.');
+      try {
+        const { error } = await supabase.from('user_titles').delete().eq('user_id', userId);
+        if (error) {
+          console.error('Ducere: failed to reset archive', error);
+          setDataError('Your archive could not be reset. Please try again.');
+          return;
+        }
+      } catch (error) {
+        console.error('Ducere: reset request failed', error);
+        setDataError('We could not reach the server, so your archive was not reset. Please try again.');
         return;
       }
     }
