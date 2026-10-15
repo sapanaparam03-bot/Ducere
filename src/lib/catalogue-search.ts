@@ -1,7 +1,6 @@
-import { coverArt, type Title } from './ducere';
+import { coverArt, type Title, type TitleType } from './ducere';
 
 type TvMazeSearchEntry = {
-  score?: number;
   show?: {
     id: number;
     name: string;
@@ -11,14 +10,19 @@ type TvMazeSearchEntry = {
     image?: { medium?: string | null; original?: string | null } | null;
     summary?: string | null;
     premiered?: string | null;
-    ended?: string | null;
     runtime?: number | null;
     averageRuntime?: number | null;
-    language?: string | null;
-    network?: { name?: string | null } | null;
-    webChannel?: { name?: string | null } | null;
   } | null;
 };
+
+type WikidataSearchEntry = {
+  id: string;
+  label?: string;
+  description?: string;
+  concepturi?: string;
+};
+
+type WikidataSearchResponse = { search?: WikidataSearchEntry[] };
 
 const stripMarkup = (value: string | null | undefined) =>
   (value ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
@@ -27,6 +31,11 @@ const stripMarkup = (value: string | null | undefined) =>
 const yearFrom = (value: string | null | undefined) => {
   const year = Number(value?.slice(0, 4));
   return Number.isFinite(year) && year > 1800 ? year : 0;
+};
+
+const yearFromDescription = (value: string) => {
+  const match = value.match(/\b((?:18|19|20)\d{2})\b/);
+  return match ? Number(match[1]) : 0;
 };
 
 const mapTvMazeResult = (entry: TvMazeSearchEntry): Title | null => {
@@ -48,8 +57,6 @@ const mapTvMazeResult = (entry: TvMazeSearchEntry): Title | null => {
     runtime: show.averageRuntime || show.runtime ? `${show.averageRuntime ?? show.runtime} min episodes` : 'Series',
     cast: [],
     director: 'TVmaze',
-    seasons: undefined,
-    episodes: undefined,
     providers: [],
     source: {
       name: 'TVmaze',
@@ -59,39 +66,115 @@ const mapTvMazeResult = (entry: TvMazeSearchEntry): Title | null => {
   };
 };
 
-async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+const typeFromDescription = (description: string): TitleType | null => {
+  if (/\banime\b/i.test(description) && /\b(series|film|movie|animation|television)\b/i.test(description)) return 'anime';
+  if (/\b(television series|tv series|television show|television program|sitcom)\b/i.test(description)) return 'tv';
+  if (/\b(film|movie|motion picture)\b/i.test(description)) return 'movie';
+  return null;
+};
+
+const mapWikidataResult = (entry: WikidataSearchEntry, requestedType: 'all' | TitleType): Title | null => {
+  const name = entry.label?.trim();
+  const description = entry.description?.trim() ?? '';
+  const detectedType = typeFromDescription(description);
+  if (!name || !detectedType || (requestedType !== 'all' && detectedType !== requestedType)) return null;
+
+  const year = yearFromDescription(description);
+  return {
+    id: `wikidata-${entry.id}`,
+    name,
+    type: detectedType,
+    poster: coverArt(name, detectedType),
+    backdrop: coverArt(name, detectedType),
+    description: description || 'Basic factual metadata from Wikidata.',
+    releaseYear: year,
+    genres: [detectedType === 'movie' ? 'Movie' : detectedType === 'tv' ? 'Series' : 'Anime'],
+    rating: 0,
+    runtime: detectedType === 'movie' ? 'Feature film' : 'Series',
+    cast: [],
+    director: 'Wikidata',
+    providers: [],
+    source: {
+      name: 'Wikidata',
+      url: entry.concepturi ?? `https://www.wikidata.org/wiki/${entry.id}`,
+      license: 'CC0',
+    },
+  };
+};
+
+async function fetchJson<T>(url: string, signal: AbortSignal, wikidata = false): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (wikidata) headers['Api-User-Agent'] = 'Ducere/1.0 (https://github.com/sapanaparam03-bot/Ducere)';
+  const response = await fetch(url, { signal, headers });
   if (!response.ok) {
-    if (response.status === 429) throw new Error('The series catalogue is busy. Please wait a moment and try again.');
-    throw new Error(`Series search failed (${response.status}).`);
+    if (response.status === 429) throw new Error('The catalogue source is busy. Please wait a moment and try again.');
+    throw new Error(`Catalogue search failed (${response.status}).`);
   }
   return response.json() as Promise<T>;
 }
 
-/**
- * User-initiated, on-demand TV-series search. This deliberately does not crawl
- * the provider's full catalogue or permanently store provider data in browser storage.
- * TVmaze data is CC BY-SA; results carry a source link for attribution.
- */
-export async function searchExternalSeries(query: string): Promise<Title[]> {
-  const normalized = query.trim();
-  if (normalized.length < 2) return [];
-
+async function withTimeout<T>(request: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 7000);
   try {
-    const url = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(normalized)}`;
-    const entries = await fetchJson<TvMazeSearchEntry[]>(url, controller.signal);
-    const seen = new Set<string>();
-    return entries
-      .map(mapTvMazeResult)
-      .filter((title): title is Title => {
-        if (!title || seen.has(title.id)) return false;
-        seen.add(title.id);
-        return true;
-      })
-      .slice(0, 20);
+    return await request(controller.signal);
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+async function searchTvMaze(query: string): Promise<Title[]> {
+  const url = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`;
+  const entries = await withTimeout((signal) => fetchJson<TvMazeSearchEntry[]>(url, signal));
+  return entries.map(mapTvMazeResult).filter((title): title is Title => Boolean(title)).slice(0, 20);
+}
+
+async function searchWikidata(query: string, type: 'all' | TitleType): Promise<Title[]> {
+  const params = new URLSearchParams({
+    action: 'wbsearchentities',
+    search: query,
+    language: 'en',
+    uselang: 'en',
+    type: 'item',
+    limit: '20',
+    format: 'json',
+    origin: '*',
+  });
+  const url = `https://www.wikidata.org/w/api.php?${params.toString()}`;
+  const result = await withTimeout((signal) => fetchJson<WikidataSearchResponse>(url, signal, true));
+  return (result.search ?? [])
+    .map((entry) => mapWikidataResult(entry, type))
+    .filter((title): title is Title => Boolean(title))
+    .slice(0, 20);
+}
+
+/**
+ * User-initiated search only: TVmaze supplies series metadata; Wikidata supplies
+ * CC0 factual labels/descriptions for films, TV, and anime. No provider is crawled
+ * in bulk, and no external response is permanently cached by this module.
+ */
+export async function searchExternalCatalogue(query: string, type: 'all' | TitleType = 'all'): Promise<Title[]> {
+  const normalized = query.trim();
+  if (normalized.length < 2) return [];
+
+  const [seriesResult, wikidataResult] = await Promise.allSettled([
+    type === 'all' || type === 'tv' ? searchTvMaze(normalized) : Promise.resolve([] as Title[]),
+    searchWikidata(normalized, type),
+  ]);
+
+  const titles = [
+    ...(seriesResult.status === 'fulfilled' ? seriesResult.value : []),
+    ...(wikidataResult.status === 'fulfilled' ? wikidataResult.value : []),
+  ];
+  const seen = new Set<string>();
+  const unique = titles.filter((title) => {
+    if (seen.has(title.id)) return false;
+    seen.add(title.id);
+    return true;
+  });
+
+  if (unique.length === 0 && seriesResult.status === 'rejected' && wikidataResult.status === 'rejected') {
+    throw new Error('Catalogue search is temporarily unavailable. Please try again.');
+  }
+  return unique.slice(0, 30);
 }
