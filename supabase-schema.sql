@@ -39,6 +39,14 @@ create policy "profiles own row" on public.profiles for all using (auth.uid() = 
 drop policy if exists "titles own rows" on public.user_titles;
 create policy "titles own rows" on public.user_titles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Data API grants are explicit: RLS controls which rows signed-in users can access.
+-- Keep personal data unavailable to anonymous/public roles, including on projects
+-- where older default privileges may have granted access automatically.
+revoke all privileges on table public.profiles from public, anon;
+revoke all privileges on table public.user_titles from public, anon;
+grant select, insert, update, delete on table public.profiles to authenticated;
+grant select, insert, update, delete on table public.user_titles to authenticated;
+
 create or replace function public.handle_new_user() returns trigger
 language plpgsql
 security definer
