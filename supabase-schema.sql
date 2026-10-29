@@ -58,7 +58,10 @@ begin
   on conflict (id) do nothing;
   return new;
 end;
-$$;
+$;
+
+-- The trigger invokes this function; browser roles must not call the definer function directly.
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
