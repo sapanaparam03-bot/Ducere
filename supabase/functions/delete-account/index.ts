@@ -30,7 +30,7 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
 
   const authorization = request.headers.get("Authorization");
-  const token = authorization?.match(/^Bearer\\s+(.+)$/i)?.[1];
+  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -59,7 +59,7 @@ Deno.serve(async (request) => {
     }
 
     // Foreign keys with ON DELETE CASCADE remove the profile and archive rows.
-    return json({ success: true });
+    return json({ success: true }, 200, origin);
   } catch (error) {
     console.error("delete-account: unexpected failure", error);
     return json({ error: "Account deletion failed. Please try again." }, 500, origin);
