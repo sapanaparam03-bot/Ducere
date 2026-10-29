@@ -26,7 +26,9 @@ Use a dedicated test account and sample data.
 
 ## Supabase and account checks (requires an active project)
 - [ ] Confirm the deployed schema matches the checked-in schema.
+- [ ] Confirm anonymous clients have no table privileges on personal profile/archive tables.
 - [ ] Verify Row Level Security prevents access to another user's records.
+- [ ] Enable leaked-password protection in Supabase Auth and confirm the security advisor warning is cleared.
 - [ ] Register, sign in, refresh, and sign out.
 - [ ] Confirm archive and profile persist after reload and on a second device.
 - [ ] Test network failure and verify data is not silently lost.
