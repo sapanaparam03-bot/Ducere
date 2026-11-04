@@ -20,6 +20,8 @@ Use a dedicated test account and sample data.
 - [ ] Episode progress, ratings, and reviews survive reload.
 - [ ] Search does not show duplicate cards for the same title.
 - [ ] Missing posters and metadata have graceful fallbacks.
+- [ ] Poster artwork loads for curated movies, TV, and anime after lazy loading; failed image sources fall back without repeated requests.
+- [ ] Confirm artwork source attribution/licensing and image-host terms before commercial release; do not treat generated placeholder covers as real posters.
 - [ ] CSV and JSON exports download and preserve non-English characters.
 - [ ] Invalid or oversized imports are rejected clearly.
 - [ ] A mismatched imported release year does not silently choose another adaptation.
@@ -30,6 +32,8 @@ Use a dedicated test account and sample data.
 - [ ] Verify Row Level Security prevents access to another user's records.
 - [ ] If the Supabase plan supports it (Pro and above), enable leaked-password protection and confirm the security advisor warning is cleared; if staying on Free, document this as a plan limitation and retain strong password requirements.
 - [ ] Register, sign in, refresh, and sign out.
+- [ ] Request a password-reset email, open the link on the production domain, set a new password, and sign in with it.
+- [ ] Confirm expired/invalid reset links show a recoverable error and do not create a second account.
 - [ ] Confirm archive and profile persist after reload and on a second device.
 - [ ] Test network failure and verify data is not silently lost.
 - [ ] Test archive reset with a dedicated account.
