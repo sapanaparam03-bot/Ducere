@@ -49,5 +49,17 @@ Use a dedicated test account and sample data.
 - [ ] Verify provider links open the expected destination.
 - [ ] Test missing and invalid API credentials without exposing secrets.
 
+## Security, privacy and legal release gate
+- [ ] Publish a Privacy Policy and Terms of Service that accurately describe collection, use, processors, retention, deletion, international transfers, user rights, contact details and applicable age restrictions.
+- [ ] Complete a jurisdiction-by-jurisdiction privacy review for launch markets, including India's DPDP framework and rules/commencement provisions then in force; obtain qualified legal review.
+- [ ] Confirm every poster, backdrop, logo, font, icon, rating and promotional asset has documented rights for the intended display and commercial use. Public availability is not a licence.
+- [ ] Confirm TVmaze CC BY-SA attribution and ShareAlike obligations are met before storing or redistributing derived catalogue data.
+- [ ] Confirm Watchmode plan, attribution, non-image caching window, and prohibition on assuming rights to third-party images; do not hotlink provider image URLs.
+- [ ] Verify rate limits or abuse controls for expensive external API calls; test repeated requests, oversized input, malformed JSON, and concurrent requests.
+- [ ] Review browser security headers and CSP against actual production scripts, styles, API and image origins; add CSP only after compatibility testing.
+- [ ] Enable repository secret scanning/dependency alerts where available; rotate any credential that was ever committed or exposed.
+- [ ] Verify database backups/restore process and account deletion across Auth, database, exports and any other retained copies.
+- [ ] Conduct an independent security review before public launch; automated CI and RLS checks are not a penetration test.
+
 ## Release gate
 Do not describe Ducere as production-ready until repository checks pass and live account, data-isolation, deletion, and streaming checks are complete. Record the tested commit, date, device/browser, and failures.
