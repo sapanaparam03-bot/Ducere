@@ -32,3 +32,20 @@
 4. Store only fields the source license permits Ducere to retain; record source, license, fetched time, and expiry.
 5. Add trusted server-side ingestion only after licensing and database readiness are verified.
 6. Keep streaming availability separate from catalogue metadata and refresh it according to the provider's permitted caching window.
+
+## Streaming availability provider restrictions
+
+- Watchmode's API terms permit use of its non-image data in an app owned by the account holder, subject to the selected plan and attribution/link requirements. Free-plan non-image data may be cached for no more than 30 days; paid-plan caching is tied to an active subscription and must remain reasonably current.
+- Watchmode does not grant rights to third-party posters, backdrops, logos, or other media returned by its API. Do not use Watchmode image URLs as if they were licensed assets, and do not hotlink its image CDN. Obtain image rights separately or use Ducere-created placeholders.
+- Do not resell or redistribute Watchmode data. Confirm the account's actual plan, attribution obligations, caching implementation, and commercial permissions before enabling paid/commercial use.
+- The current Edge Function returns provider names, offer types, region and provider destination URLs; it does not intentionally return image fields. Keep this separation.
+- Recheck the provider terms before each commercial launch because terms and plans can change.
+
+## Release legal gate
+
+- Publicly accessible artwork is not automatically public domain or licensed for commercial display. Every poster, backdrop, logo, font, icon, and promotional asset must have a recorded licence/permission or be replaced by an original asset.
+- Do not use IMDb, Rotten Tomatoes, streaming-service logos, or platform brand assets unless the relevant terms or a licence permit the exact use. A score or logo appearing on a public webpage is not permission to republish it.
+- Keep source attribution visible where required, retain source/license/fetched-at metadata, and provide a takedown/contact process.
+- Publish accurate Privacy Policy, Terms of Service, account deletion instructions, and contact details before opening registration to the public. Explain what personal data is collected, purposes, processors, retention/deletion, international transfers, and user rights. Obtain legal review for the countries where Ducere will be offered.
+- For India, assess the Digital Personal Data Protection Act, 2023 and rules/commencement notifications in force at launch; do not assume that a generic privacy notice is sufficient. If serving children or users in other jurisdictions, assess age-related and local privacy requirements separately.
+- These notes are engineering release controls, not a legal opinion or a guarantee of compliance.
