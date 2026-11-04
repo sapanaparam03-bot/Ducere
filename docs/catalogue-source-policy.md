@@ -51,3 +51,14 @@
 - Publish accurate Privacy Policy, Terms of Service, account deletion instructions, and contact details before opening registration to the public. Explain what personal data is collected, purposes, processors, retention/deletion, international transfers, and user rights. Obtain legal review for the countries where Ducere will be offered.
 - For India, assess the Digital Personal Data Protection Act, 2023 and rules/commencement notifications in force at launch; do not assume that a generic privacy notice is sufficient. If serving children or users in other jurisdictions, assess age-related and local privacy requirements separately.
 - These notes are engineering release controls, not a legal opinion or a guarantee of compliance.
+
+
+## Approved independent community catalogue direction (4 November 2026)
+
+The target architecture is documented in [COMMUNITY-CATALOGUE-ARCHITECTURE.md](COMMUNITY-CATALOGUE-ARCHITECTURE.md). The selected initial countries are IN, US, GB, CA, DE, and AU. The catalogue is intended to grow toward all titles that can be lawfully recorded. Posters, backdrops, stills, and third-party artwork are excluded initially.
+
+Community submissions may provide factual corrections and official destination links, but do not grant Ducere permission to copy protected databases, catalogue pages, descriptions, images, or other protected content. Do not scrape Google or streaming services. Record evidence URLs and review them; do not fetch arbitrary user URLs server-side. Community votes are not proof: keep new reports pending until evidence/moderation meets the verification standard. Preserve an audit trail and previous values.
+
+The long-term system will use Ducere-owned title, provider, availability-claim, correction-report, vote, evidence, moderation, reputation, and change-history records. Public users may read only approved catalogue/verified availability; authenticated users may submit their own reports and votes; only trusted server-side moderation may verify or reject claims. Apply RLS, unique vote constraints, rate limits, URL validation, and role checks.
+
+The existing TVmaze/Wikidata on-demand search and Watchmode availability integration are transitional. Do not remove them until the Ducere-owned catalogue and community availability workflow have been implemented, tested, and migrated without losing personal watchlists, history, ratings, or episode progress. The new target architecture is approved, but it has not yet been deployed to the live database.
