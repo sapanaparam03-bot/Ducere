@@ -35,9 +35,11 @@
 
 ## Streaming availability provider restrictions
 
-- Watchmode's API terms permit use of its non-image data in an app owned by the account holder, subject to the selected plan and attribution/link requirements. Free-plan non-image data may be cached for no more than 30 days; paid-plan caching is tied to an active subscription and must remain reasonably current.
-- Watchmode does not grant rights to third-party posters, backdrops, logos, or other media returned by its API. Do not use Watchmode image URLs as if they were licensed assets, and do not hotlink its image CDN. Obtain image rights separately or use Ducere-created placeholders.
-- Do not resell or redistribute Watchmode data. Confirm the account's actual plan, attribution obligations, caching implementation, and commercial permissions before enabling paid/commercial use.
+- Watchmode's API terms (checked 4 November 2026) allow non-image data to be used in an app owned by the account holder, subject to the applicable plan. The Developer/free plan is **non-commercial only**, requires attribution/linking wherever its data is displayed, and permits up to 30 days of non-image caching. Commercial use requires a Startup, Business, or Enterprise plan. Do not market, monetize, or commercially distribute a build using Watchmode data on the free plan.
+- The published Watchmode pricing currently lists Startup at USD $349/month and Business at USD $599/month. Verify current pricing and account entitlement before launch; this is a material ongoing operating cost, not an assumed free entitlement.
+- Watchmode's API terms state that the API is unavailable to children under 13 and that users aged 13 to under 18 (or below the higher local age of majority) need parent/legal-guardian approval. Ducere must not claim universal access while relying on Watchmode. Implement an appropriate age/guardian-consent flow or restrict the Watchmode feature by age and jurisdiction, subject to legal review.
+- Watchmode does not grant rights to third-party posters, backdrops, logos, or other images returned by its API. Do not use Watchmode image URLs as if they were licensed assets, and do not hotlink its image CDN. Obtain image rights separately or use Ducere-created placeholders.
+- Do not resell or redistribute Watchmode data. Confirm the account's actual plan, attribution obligations, caching implementation, age restrictions, and commercial permissions before enabling commercial use.
 - The current Edge Function returns provider names, offer types, region and provider destination URLs; it does not intentionally return image fields. Keep this separation.
 - Recheck the provider terms before each commercial launch because terms and plans can change.
 
