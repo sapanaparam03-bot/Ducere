@@ -4,6 +4,12 @@
 
 Ducere is a responsive React + Vite app for tracking movies, television, and anime. It includes a personal library, watchlist, in-progress tracking, title details, recommendations, calendar, profile insights, import/export tools, and region-aware streaming availability integrations.
 
+## Product direction
+
+Ducere's approved target direction is an independent, community-maintained catalogue for India, the United States, the United Kingdom, Canada, Germany, and Australia. Users can suggest corrections to streaming availability, provide evidence, and confirm or dispute reports. Community votes are not proof by themselves; verified listings require evidence and moderation. Posters and third-party artwork are excluded initially.
+
+See [the community catalogue architecture](docs/COMMUNITY-CATALOGUE-ARCHITECTURE.md) for the data model, security rules, migration constraints, rollout phases, and acceptance criteria. This is the target architecture, not a claim that the replacement has already been deployed.
+
 ## Development
 
 Requirements: Node.js 20+ and npm.
@@ -35,14 +41,16 @@ These are browser-visible configuration values. Never set a Supabase service-rol
 4. Configure email/auth redirect URLs for the final production domain.
 5. Deploy and test Edge Functions separately; see `docs/PRODUCTION-SETUP.md` and `docs/ACCOUNT-DELETION-DEPLOYMENT.md`.
 
-The `watchmode-availability` Edge Function needs the server-side `WATCHMODE_API_KEY` secret. The `delete-account` function needs `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` configured as Edge Function secrets. Do not expose the service-role key to the browser.
+The current `watchmode-availability` Edge Function is transitional and remains in place until the Ducere-owned availability workflow reaches feature parity and passes migration/security tests. Do not remove it or the existing on-demand catalogue search prematurely. Its server-side secret must never be exposed in browser code.
 
 ## Release readiness
 
-Passing automated tests and a production build is necessary, not sufficient. Authentication, RLS isolation, multi-device persistence, account deletion, and live provider lookups must be tested against an active Supabase project before calling the app production-ready. Follow `docs/RELEASE-READINESS-CHECKLIST.md`.
+Passing automated tests and a production build is necessary, not sufficient. Authentication, RLS isolation, multi-device persistence, account deletion, community-report abuse controls, moderation, and live availability freshness must be tested against an active Supabase project before calling the app production-ready. Follow `docs/RELEASE-READINESS-CHECKLIST.md`.
 
 ## Key docs
 
+- `docs/COMMUNITY-CATALOGUE-ARCHITECTURE.md` — approved target architecture and rollout plan.
+- `docs/catalogue-source-policy.md` — source, licensing, and data collection rules.
 - `docs/PRODUCTION-SETUP.md` — deployment and secret configuration.
 - `docs/RELEASE-READINESS-CHECKLIST.md` — release gates and manual smoke tests.
 - `docs/ACCOUNT-DELETION-DEPLOYMENT.md` — secure account deletion setup.
