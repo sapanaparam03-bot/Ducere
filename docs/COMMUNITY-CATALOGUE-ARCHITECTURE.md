@@ -9,6 +9,26 @@
 - Preserve the existing user library, watchlist, watching status, episode progress, ratings/reviews, recommendations, calendar, insights, imports/exports, profiles, and settings.
 - Do not scrape Google or streaming services, bypass access controls, or bulk-copy third-party catalogues. A user-submitted fact/link is not automatically permission to copy a provider's protected database or content.
 
+### Verified code inventory (4 November 2026)
+
+The following details were checked in the current `main` branch during implementation planning:
+
+- `supabase-schema.sql` defines `profiles` and `user_titles`. The personal library primary key is (`user_id`, `title_id`), and `title_id` is text. Status values are `watchlist`, `watching`, and `watched`; season, episode, progress, rating, review, and dates are stored there. Preserve these fields and their values.
+- `src/hooks/use-catalog.ts` currently merges a built-in catalogue with locally retained selected titles. Its current selected-title validation expects IDs prefixed `tvmaze-` or `wikidata-` and includes poster/backdrop fields. A migration must support legacy IDs and change this validation deliberately rather than silently dropping saved selections.
+- `src/lib/catalogue-search.ts` currently performs user-initiated TVmaze show search and Wikidata entity search. It maps TVmaze artwork into poster/backdrop fields and includes TVmaze descriptions. Do not bulk import from these endpoints; replace this path only after Ducere's own title submission/search is ready.
+- `src/lib/live-catalog.ts` currently returns the built-in `TITLES` list only; despite the name, it does not load the proposed shared database.
+- `src/lib/availability.ts` calls the `watchmode-availability` Edge Function. `src/components/availability-panel.tsx` displays Watchmode attribution and calls returned records verified. Replace this carefully: the new UI must show pending/contested/expired states accurately and must not label unverified community submissions as verified.
+- The existing `supabase-catalogue-schema.sql` is only a proposal. It is source-centric, contains poster/backdrop/still fields, and permits broad public reads. It does not implement community reports, votes, evidence, moderation, or reputation. Do not apply it unchanged.
+
+### Compatibility and migration requirements
+
+- Keep legacy IDs valid during migration; do not assume every existing ID can be rewritten immediately.
+- Introduce a stable Ducere-owned ID for new catalogue records and a mapping table for legacy IDs.
+- Preserve localStorage-selected titles where possible; migrate them only after title identity is checked and the user library is backed up.
+- Keep the existing personal library schema and RLS intact until the new mapping and integration have passed tests.
+- Remove poster rendering from the UI as a deliberate product change, but do not delete old artwork fields from existing records until the migration is verified and no feature depends on them.
+- Replace the Watchmode UI's unconditional "verified" language with status-aware wording as part of availability integration.
+
 ## Current implementation facts and migration constraint
 
 The current React/Vite app uses Supabase for accounts and personal library sync. The existing `public.user_titles.title_id` is text, so new catalogue IDs must remain stable text identifiers. The app currently has a built-in catalogue, on-demand TVmaze/Wikidata search, and a Watchmode availability Edge Function. These must not be removed until the replacement catalogue and availability workflow has passed feature-parity and migration tests.
