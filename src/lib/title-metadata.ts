@@ -20,6 +20,8 @@ type AniListResponse = {
     Media?: {
       id: number;
       episodes?: number | null;
+      title?: { romaji?: string | null; english?: string | null };
+      startDate?: { year?: number | null };
       coverImage?: { extraLarge?: string | null; large?: string | null } | null;
       relations?: {
         edges?: Array<{
@@ -130,6 +132,8 @@ const aniListMedia = async (title: Title) => {
     Media(id: $id, idMal: $idMal, search: $search, type: ANIME) {
       id
       episodes
+      title { romaji english }
+      startDate { year }
       coverImage { extraLarge large }
       relations {
         edges {
@@ -153,11 +157,25 @@ const aniListMedia = async (title: Title) => {
     query,
     variables: idMal ? { idMal: Number(idMal) } : { search },
   };
-  return fetchWithTimeout<AniListResponse>('https://graphql.anilist.co', {
+  const result = await fetchWithTimeout<AniListResponse>('https://graphql.anilist.co', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   });
+
+  // Search endpoints can return a similarly named adaptation. Do not attach
+  // its artwork or episode metadata unless the returned title is an exact match.
+  const media = result.data?.Media;
+  if (!idMal && media) {
+    const expected = normalizeTitle(search);
+    const names = [media.title?.english, media.title?.romaji].filter(Boolean).map((name) => normalizeTitle(name!));
+    if (!names.includes(expected)) return { data: { Media: null } };
+    const sourceYear = media.startDate?.year;
+    if (title.releaseYear && sourceYear && Math.abs(sourceYear - title.releaseYear) > 1) {
+      return { data: { Media: null } };
+    }
+  }
+  return result;
 };
 
 const aniListMetadata = async (title: Title) => {
