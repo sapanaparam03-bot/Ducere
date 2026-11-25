@@ -74,6 +74,19 @@ This is a preliminary feature-based inventory, not a confirmed statement of ever
 
 **Do not collect sensitive personal data or unnecessary birth dates.** If age screening or guardian consent is required for a third-party provider, collect the minimum information needed and have the mechanism legally reviewed.
 
+## 4A. Built-in catalogue and metadata provenance
+
+The built-in curated shelf contains title names, release years, genres, numeric ratings, plot descriptions, cast/director names, runtime values, and provider references. The current code uses Ducere-generated SVG cover placeholders, but the origin and licence/provenance for each factual or editorial field are not fully recorded in a field-level source register.
+
+Before public or commercial release:
+- Trace every curated title field to its original source or document that it was independently authored/verified by Ducere.
+- Treat numeric ratings and review scores as a separate third-party data source; do not assume IMDb, Rotten Tomatoes, TMDB, or another site's score can be republished because it is visible online.
+- Rewrite plot summaries in original wording or obtain a licence; do not copy provider synopses or editorial text.
+- Record provenance and permitted use for cast, crew, release dates, runtime, genres, and provider references. Facts may be treated differently from expressive text or protected database compilations, but database rights and contract terms can still apply.
+- Remove or suppress any field whose source or permitted use cannot be established.
+- Keep provider names as factual identifiers only; remove logos and any implication of endorsement.
+- Confirm that the built-in placeholder is an original Ducere asset and that no external poster URL is loaded. The initial release must remain poster/artwork-free.
+
 ## 5. Privacy, consumer and age compliance
 
 - Prepare a real Privacy Notice and Terms of Service before public registration. They must name the actual operator/data fiduciary, contact channel, purposes, lawful basis/consent mechanism, data categories, processors, retention, deletion, user rights, international transfers, community-content rules, moderation/appeals, liability limitations and governing law.
