@@ -41,7 +41,11 @@ const readSelectedTitles = (): Title[] => {
       ? { ...title, poster: coverArt(title.name, title.type), backdrop: coverArt(title.name, title.type) }
       : title);
     if (posterFree.some((title, index) => title.poster !== selected[index].poster || title.backdrop !== selected[index].backdrop)) {
-      localStorage.setItem(SELECTED_TITLES_KEY, JSON.stringify(posterFree));
+      try {
+        localStorage.setItem(SELECTED_TITLES_KEY, JSON.stringify(posterFree));
+      } catch {
+        // Keep the sanitized in-memory records even when browser storage is unavailable.
+      }
     }
     return posterFree;
   } catch {
