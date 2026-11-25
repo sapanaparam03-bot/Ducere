@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TITLES, type Title, type TitleType } from '@/lib/ducere';
+import { TITLES, coverArt, type Title, type TitleType } from '@/lib/ducere';
 import { loadLiveCatalog } from '@/lib/live-catalog';
 import { cancelExternalCatalogueSearch, searchExternalCatalogue } from '@/lib/catalogue-search';
 import { mergeCatalogueTitles } from '@/lib/catalogue-utils.js';
@@ -33,7 +33,17 @@ const readSelectedTitles = (): Title[] => {
     const raw = localStorage.getItem(SELECTED_TITLES_KEY);
     if (!raw) return [];
     const value = JSON.parse(raw) as unknown;
-    return Array.isArray(value) ? value.filter(isSelectedTitle).slice(-500) : [];
+    if (!Array.isArray(value)) return [];
+    const selected = value.filter(isSelectedTitle).slice(-500);
+    // Older saved TVmaze results may contain third-party image URLs. Replace them
+    // with Ducere-created placeholders before they can reach the UI.
+    const posterFree = selected.map((title) => title.id.startsWith('tvmaze-')
+      ? { ...title, poster: coverArt(title.name, title.type), backdrop: coverArt(title.name, title.type) }
+      : title);
+    if (posterFree.some((title, index) => title !== selected[index])) {
+      localStorage.setItem(SELECTED_TITLES_KEY, JSON.stringify(posterFree));
+    }
+    return posterFree;
   } catch {
     return [];
   }
