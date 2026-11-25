@@ -42,7 +42,8 @@ const yearFromDescription = (value: string) => {
 const mapTvMazeResult = (entry: TvMazeSearchEntry): Title | null => {
   const show = entry.show;
   if (!show?.id || !show.name?.trim()) return null;
-  const poster = show.image?.original ?? show.image?.medium ?? coverArt(show.name, 'tv');
+  // Ducere's initial catalogue is intentionally poster-free. Never pass provider artwork URLs into the UI.
+  const poster = coverArt(show.name, 'tv');
   const rating = show.rating?.average;
   const description = stripMarkup(show.summary);
   return {
