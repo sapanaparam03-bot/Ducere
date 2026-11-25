@@ -10,7 +10,7 @@ const isSelectedTitle = (item: unknown): item is Title => {
   if (!item || typeof item !== 'object') return false;
   const title = item as Partial<Title>;
   const validId = typeof title.id === 'string' &&
-    (title.id.startsWith('tvmaze-') || title.id.startsWith('wikidata-'));
+    (title.id.startsWith('tvmaze-') || title.id.startsWith('wikidata-') || title.id.startsWith('wikidata:'));
   const validSource = Boolean(title.source && typeof title.source.name === 'string' &&
     typeof title.source.url === 'string' && /^https?:\/\//i.test(title.source.url));
   return Boolean(validId && validSource &&
