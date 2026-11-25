@@ -17,7 +17,7 @@ The following details were checked in the current `main` branch during implement
 - `src/hooks/use-catalog.ts` currently merges a built-in catalogue with locally retained selected titles. Its selected-title validation accepts new `wikidata:` identifiers and retains legacy `tvmaze-`/`wikidata-` identifiers and includes poster/backdrop fields. A migration must support legacy IDs and change this validation deliberately rather than silently dropping saved selections.
 - `src/lib/catalogue-search.ts` performs user-initiated Wikidata searches only. Wikidata structured data is CC0; the adapter links to the QID and uses Ducere-created placeholders. TVmaze was removed from new searches; legacy saved TVmaze titles remain in local libraries for continuity.
 - `src/lib/live-catalog.ts` currently returns the built-in `TITLES` list only; despite the name, it does not load the proposed shared database.
-- `src/lib/availability.ts` no longer calls a third-party provider. The UI deliberately shows no confirmed results until the first-party community reports, votes, moderation and expiry tables are deployed and tested.
+- The old availability client module has been removed. `src/components/availability-panel.tsx` deliberately shows no confirmed results until first-party community reports, votes, moderation and expiry tables are deployed and tested.
 - The existing `supabase-catalogue-schema.sql` is only a proposal. It is source-centric, contains poster/backdrop/still fields, and permits broad public reads. It does not implement community reports, votes, evidence, moderation, or reputation. Do not apply it unchanged.
 
 ### Compatibility and migration requirements
