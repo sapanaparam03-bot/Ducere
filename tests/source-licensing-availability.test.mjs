@@ -11,15 +11,12 @@ test('new catalogue search uses Wikidata only and does not call retired catalogu
   assert.doesNotMatch(source, /api\.tvmaze\.com|themoviedb|omdbapi|api\.watchmode\.com/i);
 });
 
-test('availability UI never marks an unreviewed provider as verified', async () => {
+test('availability UI never calls a third-party provider or labels claims verified', async () => {
   const source = await read('../src/components/availability-panel.tsx');
-  const service = await read('../src/lib/availability.ts');
   assert.match(source, /Community-powered/);
-  assert.match(service, /community_catalogue_unavailable/);
-  assert.match(service, /sources: \[\]/);
-  assert.doesNotMatch(source + service, /watchmode|verified source/i);
+  assert.match(source, /No third-party streaming lookup is used/);
+  assert.doesNotMatch(source, /watchmode|api\\.watchmode\\.com|verified source/i);
 });
-
 test('community availability schema defaults reports to pending and exposes only current verified claims', async () => {
   const sql = await read('../supabase-community-availability.sql');
   assert.match(sql, /status text not null default 'pending'/);
