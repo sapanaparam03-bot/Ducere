@@ -1,64 +1,58 @@
 # Ducere catalogue source policy
 
-## Current implementation
+## Approved current source
 
-- The built-in curated shelf remains the immediate fallback and works without external catalogue services.
-- Series are searched on demand through TVmaze's public search endpoint. TVmaze states that its API is licensed under CC BY-SA and allows commercial use when attribution and ShareAlike requirements are met; search results link back to TVmaze. Ducere ignores TVmaze image fields and uses only its own neutral placeholder. Before server-side persistence, review how ShareAlike applies to Ducere's database and presentation.
-- Films, TV, and anime are also searched on demand through Wikidata's structured data, which is released under CC0. Results use a generated poster fallback rather than copying image files from Wikidata; the detail page links to the Wikidata item.
-- Neither provider is crawled in bulk at app startup. Search responses are held in memory; only when a user adds a returned title to their library is that selected title's metadata saved in that user's browser storage, together with its source URL/license, so the item can still be displayed after reload. This is not a shared server-side catalogue import.
+### Wikidata — CC0 structured data
+
+Wikidata's structured data is released under Creative Commons Zero (CC0). This is the approved external source for individual, user-initiated title lookups and factual metadata. Ducere links each result to its Wikidata item. CC0 permits reuse without attribution as a copyright condition; Ducere still provides source links for transparency and provenance.
+
+- Official licensing: https://www.wikidata.org/wiki/Wikidata:Licensing
+- Data reuse: https://www.wikidata.org/wiki/Wikidata:Reuse
+- API access and rate limits: https://www.wikidata.org/wiki/Wikidata:Data_access
+- SPARQL access policy: https://www.wikidata.org/wiki/Wikidata:SPARQL_query_service/API
+
+Operational rules:
+- Use the official Wikidata API for user-initiated searches, not bulk scraping.
+- Identify the app with a descriptive User-Agent and handle HTTP 429 responses.
+- Retain QIDs and source URLs; cache only as permitted by Wikimedia API policies.
+- Structured data is CC0; do not assume Wikipedia article prose, Commons images, logos, or other Wikimedia content has the same licence.
+- Use only fields actually returned from Wikidata. Do not invent missing facts.
+- Do not use Wikidata as a streaming availability source.
+
+## Sources not used by the current app
+
+- **TVmaze:** Its public API is CC BY-SA. Commercial use is allowed subject to attribution and ShareAlike, but Ducere has removed TVmaze from new catalogue searches to keep the initial source stack simpler. Existing locally saved TVmaze title records are retained as legacy user-library data and are not queried or refreshed. https://www.tvmaze.com/api
+- **TMDB:** Free API access is limited to non-commercial use with attribution; commercial use requires a separate licence. Not used. https://developer.themoviedb.org/docs/faq
+- **IMDb / Rotten Tomatoes:** No public reuse licence for the intended commercial catalogue/ratings use has been established. Do not copy scores, reviews, text or logos.
+- **OMDb:** Its terms restrict use to personal/non-commercial purposes; not suitable for a commercial catalogue. Not used. https://www.omdbapi.com/legal.htm
+- **Jikan / MyAnimeList:** Do not use unofficial scraper-backed routes or upstream data without clear written rights for Ducere's intended storage and commercial use.
+- **AniList:** Do not bulk-import or persist data until the current API terms and exact reuse/caching rights have been reviewed.
+- **Google Search:** No scraping, result copying, or search-derived catalogue. Any future official API must be reviewed separately.
+- **Streaming services:** No crawling, scraping, reverse engineering, or automated extraction of provider catalogues. Official title URLs may be submitted by users as evidence, but Ducere does not fetch or copy page content.
+
+## Streaming availability: Ducere-owned community source
+
+Watchmode has been removed from application code. There is no third-party availability API.
+
+- Users may submit factual claims that a title is offered by a service in a particular country.
+- A submission includes title ID, country, provider name, access type, official title URL, evidence URL and a reason.
+- Evidence URLs are stored as links only. Ducere does not scrape, proxy, or server-fetch provider pages.
+- Reports begin as pending. Votes are signals only and cannot automatically establish availability.
+- Only trusted moderation may publish a verified claim after reviewing evidence.
+- Verified claims expire unless rechecked; disputed or expired reports are not shown as current.
+- Provider names are factual identifiers; no logos or implied endorsements.
+- Until the community database and moderation workflow are deployed and security-tested, the app deliberately displays no confirmed availability.
+
+## Built-in curated titles
+
+The current built-in shelf contains editorial descriptions and factual fields whose individual source history is not fully recorded. Aggregate ratings and hard-coded streaming-provider claims have been removed from the curated-title builder. Before public/commercial release, review each remaining synopsis, cast/crew, runtime, genre and release-year field. Keep only independently authored or appropriately licensed text and facts with documented provenance. For future catalogue records, prefer Wikidata CC0 structured facts and Ducere-authored descriptions.
 
 ## Do not do
 
-- Do not scrape Google Search results or build a permanent database from them without express permission.
-- Do not bulk-import/copy provider catalogues until the applicable terms explicitly permit the intended collection, commercial use, caching, images, redistribution, and scale.
-- Never expose a Supabase service-role key in browser code or a VITE_ environment variable.
-- Do not claim streaming availability unless a source specifically confirms it for the user's country and the result has a freshness timestamp.
+- Do not copy a third-party database merely because individual facts are not copyrightable.
+- Do not copy expressive text, reviews, images, logos, or database compilations without permission.
+- Do not claim availability from stale, unverified, or user-voted-only reports.
+- Never expose Supabase service-role credentials in browser code or VITE_ variables.
+- Keep posters, backdrops, stills and third-party artwork out of the initial product.
 
-## Source review queue
-
-1. TVmaze: public API docs say CC BY-SA, allow commercial use with attribution and ShareAlike; confirm the implementation's obligations before production catalogue persistence. https://www.tvmaze.com/api
-2. Wikidata: structured data is CC0. Follow Wikimedia API usage guidelines and rate limits; do not overload the public API. https://www.wikidata.org/wiki/Wikidata:Data_access/en
-3. Wikimedia/Wikipedia article text and images: licensing varies by page and media file; high-volume commercial access has separate guidance. Not used for bulk catalogue ingestion by this implementation.
-4. Jikan/MyAnimeList: unofficial scraper-backed API; do not use for permanent bulk ingestion until its terms and upstream rights have been reviewed.
-5. AniList: no bulk catalogue import until the current terms and data reuse limits have been reviewed.
-6. TMDB: no commercial catalogue use until the correct license/terms are confirmed.
-7. Google: search scraping is not an approved catalogue ingestion method. Knowledge Graph can be evaluated for individual entity lookups, not treated as a complete entertainment database.
-
-## Target architecture
-
-1. Query Ducere's own catalogue first when the database is active.
-2. On a miss, query only a reviewed source, on demand.
-3. Show attribution and the source URL where required.
-4. Store only fields the source license permits Ducere to retain; record source, license, fetched time, and expiry.
-5. Add trusted server-side ingestion only after licensing and database readiness are verified.
-6. Keep streaming availability separate from catalogue metadata and refresh it according to the provider's permitted caching window.
-
-## Streaming availability provider restrictions
-
-- Watchmode's API terms (checked 4 November 2026) allow non-image data to be used in an app owned by the account holder, subject to the applicable plan. The Developer/free plan is **non-commercial only**, requires attribution/linking wherever its data is displayed, and permits up to 30 days of non-image caching. Commercial use requires a Startup, Business, or Enterprise plan. Do not market, monetize, or commercially distribute a build using Watchmode data on the free plan.
-- The published Watchmode pricing currently lists Startup at USD $349/month and Business at USD $599/month. Verify current pricing and account entitlement before launch; this is a material ongoing operating cost, not an assumed free entitlement.
-- Watchmode's API terms state that the API is unavailable to children under 13 and that users aged 13 to under 18 (or below the higher local age of majority) need parent/legal-guardian approval. Ducere must not claim universal access while relying on Watchmode. Implement an appropriate age/guardian-consent flow or restrict the Watchmode feature by age and jurisdiction, subject to legal review.
-- Watchmode does not grant rights to third-party posters, backdrops, logos, or other images returned by its API. Do not use Watchmode image URLs as if they were licensed assets, and do not hotlink its image CDN. Obtain image rights separately or use Ducere-created placeholders.
-- Do not resell or redistribute Watchmode data. Confirm the account's actual plan, attribution obligations, caching implementation, age restrictions, and commercial permissions before enabling commercial use.
-- The current Edge Function returns provider names, offer types, region and provider destination URLs; it does not intentionally return image fields. Keep this separation.
-- Recheck the provider terms before each commercial launch because terms and plans can change.
-
-## Release legal gate
-
-- Publicly accessible artwork is not automatically public domain or licensed for commercial display. Every poster, backdrop, logo, font, icon, and promotional asset must have a recorded licence/permission or be replaced by an original asset.
-- Do not use IMDb, Rotten Tomatoes, streaming-service logos, or platform brand assets unless the relevant terms or a licence permit the exact use. A score or logo appearing on a public webpage is not permission to republish it.
-- Keep source attribution visible where required, retain source/license/fetched-at metadata, and provide a takedown/contact process.
-- Publish accurate Privacy Policy, Terms of Service, account deletion instructions, and contact details before opening registration to the public. Explain what personal data is collected, purposes, processors, retention/deletion, international transfers, and user rights. Obtain legal review for the countries where Ducere will be offered.
-- For India, assess the Digital Personal Data Protection Act, 2023 and rules/commencement notifications in force at launch; do not assume that a generic privacy notice is sufficient. If serving children or users in other jurisdictions, assess age-related and local privacy requirements separately.
-- These notes are engineering release controls, not a legal opinion or a guarantee of compliance.
-
-
-## Approved independent community catalogue direction (4 November 2026)
-
-The target architecture is documented in [COMMUNITY-CATALOGUE-ARCHITECTURE.md](COMMUNITY-CATALOGUE-ARCHITECTURE.md). The selected initial countries are IN, US, GB, CA, DE, and AU. The catalogue is intended to grow toward all titles that can be lawfully recorded. Posters, backdrops, stills, and third-party artwork are excluded initially.
-
-Community submissions may provide factual corrections and official destination links, but do not grant Ducere permission to copy protected databases, catalogue pages, descriptions, images, or other protected content. Do not scrape Google or streaming services. Record evidence URLs and review them; do not fetch arbitrary user URLs server-side. Community votes are not proof: keep new reports pending until evidence/moderation meets the verification standard. Preserve an audit trail and previous values.
-
-The long-term system will use Ducere-owned title, provider, availability-claim, correction-report, vote, evidence, moderation, reputation, and change-history records. Public users may read only approved catalogue/verified availability; authenticated users may submit their own reports and votes; only trusted server-side moderation may verify or reject claims. Apply RLS, unique vote constraints, rate limits, URL validation, and role checks.
-
-The existing TVmaze/Wikidata on-demand search and Watchmode availability integration are transitional. Do not remove them until the Ducere-owned catalogue and community availability workflow have been implemented, tested, and migrated without losing personal watchlists, history, ratings, or episode progress. The new target architecture is approved, but it has not yet been deployed to the live database.
+This is an engineering source policy, not a legal opinion. Recheck current terms and applicable database rights before commercial launch.
