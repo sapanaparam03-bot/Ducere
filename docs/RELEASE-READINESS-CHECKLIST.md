@@ -46,7 +46,7 @@ Use a dedicated test account and sample data.
 - [ ] Apply the reviewed `supabase-community-availability.sql` only after a backup and schema review.
 - [ ] Test authenticated report submission, one vote per user, reporter self-vote prevention and moderator-only verification.
 - [ ] Test pending, verified, contested, rejected, expired and removed states.
- [ ] Verify only verified, unexpired claims are public and region-specific.
+- [ ] Verify only verified, unexpired claims are public and region-specific.
 - [ ] Verify evidence URLs are HTTPS and are never fetched server-side.
 - [ ] Verify provider links open the expected official destination.
 - [ ] Test abuse limits, duplicate reports, audit history and appeal process.
