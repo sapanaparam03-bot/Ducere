@@ -38,9 +38,30 @@ const readSelectedTitles = (): Title[] => {
     // Older saved TVmaze results may contain third-party image URLs. Replace them
     // with Ducere-created placeholders before they can reach the UI.
     const posterFree = selected.map((title) => title.id.startsWith('tvmaze-')
-      ? { ...title, poster: coverArt(title.name, title.type), backdrop: coverArt(title.name, title.type) }
+      ? {
+          ...title,
+          poster: coverArt(title.name, title.type),
+          backdrop: coverArt(title.name, title.type),
+          // Keep the user's saved title identity, but stop redisplaying legacy TVmaze
+          // summaries, ratings, cast/crew, runtime, genres or provider assertions.
+          description: '',
+          genres: [],
+          rating: 0,
+          runtime: '',
+          cast: [],
+          director: '',
+          providers: [],
+        }
       : title);
-    if (posterFree.some((title, index) => title.poster !== selected[index].poster || title.backdrop !== selected[index].backdrop)) {
+    if (posterFree.some((title, index) =>
+      title.poster !== selected[index].poster ||
+      title.backdrop !== selected[index].backdrop ||
+      (selected[index].id.startsWith('tvmaze-') &&
+        (title.description !== selected[index].description ||
+         title.rating !== selected[index].rating ||
+         title.cast.length !== selected[index].cast.length ||
+         title.providers.length !== selected[index].providers.length))
+    )) {
       try {
         localStorage.setItem(SELECTED_TITLES_KEY, JSON.stringify(posterFree));
       } catch {
