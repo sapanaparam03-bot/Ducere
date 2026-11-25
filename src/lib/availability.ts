@@ -1,24 +1,26 @@
-import type { Title, Provider } from './ducere';
+import type { Title } from './ducere';
 import { supabase } from './supabase';
+import {
+  normalizeAvailabilityResult,
+  readFreshCache,
+  writeFreshCache,
+  type NormalizedAvailabilityResult,
+} from './availability-utils';
 
-export type AvailabilitySource = Provider & {
-  sourceId?: number;
-  region: string;
-  verified: true;
-};
+export type AvailabilitySource = NormalizedAvailabilityResult['sources'][number];
+export type AvailabilityResult = NormalizedAvailabilityResult;
 
-export type AvailabilityResult = {
-  titleId: number;
-  titleName: string;
-  sources: AvailabilitySource[];
-  attributionRequired: boolean;
-};
-
-const cache = new Map<string, AvailabilityResult>();
+type CacheEntry<T> = { value: T; expiresAt: number };
+const cache = new Map<string, CacheEntry<AvailabilityResult>>();
 
 export async function getTitleAvailability(title: Title, region: string): Promise<AvailabilityResult> {
-  const key = `${title.id}:${region}`;
-  const cached = cache.get(key);
+  const normalizedRegion = (region || 'US').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalizedRegion)) {
+    throw new Error('Choose a valid two-letter country code in Settings.');
+  }
+
+  const key = `${title.id}:${normalizedRegion}`;
+  const cached = readFreshCache(cache, key);
   if (cached) return cached;
 
   if (!supabase) {
@@ -30,13 +32,13 @@ export async function getTitleAvailability(title: Title, region: string): Promis
       titleName: title.name,
       mediaType: title.type === 'movie' ? 'movie' : 'tv',
       year: title.releaseYear || undefined,
-      region: region || 'US',
+      region: normalizedRegion,
     },
   });
 
   if (error) throw error;
 
-  const result = data as AvailabilityResult;
-  cache.set(key, result);
+  const result = normalizeAvailabilityResult(data, normalizedRegion);
+  writeFreshCache(cache, key, result);
   return result;
 }
