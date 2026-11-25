@@ -92,6 +92,7 @@ create policy "authenticated users can submit reports"
   on public.availability_reports for insert to authenticated
   with check (
     reporter_id = auth.uid()
+    and exists (select 1 from public.streaming_providers p where p.id = provider_id and p.active = true)
     and status = 'pending'
     and reviewed_by is null
     and reviewed_at is null
