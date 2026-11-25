@@ -19,9 +19,9 @@ Use a dedicated test account and sample data.
 - [ ] Adding a title and changing its status updates the library correctly.
 - [ ] Episode progress, ratings, and reviews survive reload.
 - [ ] Search does not show duplicate cards for the same title.
-- [ ] Missing posters and metadata have graceful fallbacks.
-- [ ] Poster artwork loads for curated movies, TV, and anime after lazy loading; failed image sources fall back without repeated requests.
-- [ ] Confirm artwork source attribution/licensing and image-host terms before commercial release; do not treat generated placeholder covers as real posters.
+- [ ] Poster/artwork areas remain blank or use only the approved original Ducere neutral placeholder; no third-party poster, backdrop, still, thumbnail, logo or image URL is requested or rendered.
+- [ ] Confirm there are no hidden poster/image dependencies in catalogue search, local storage, UI components, API responses or marketing assets.
+- [ ] Verify every curated title field (including ratings, summaries, cast/crew, runtime and provider references) has documented provenance and permitted use; remove fields that cannot be cleared.
 - [ ] CSV and JSON exports download and preserve non-English characters.
 - [ ] Invalid or oversized imports are rejected clearly.
 - [ ] A mismatched imported release year does not silently choose another adaptation.
