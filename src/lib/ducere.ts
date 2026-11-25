@@ -48,12 +48,14 @@ const curatedTitle = (
   backdrop: coverArt(name, type),
   releaseYear,
   genres,
-  rating,
+  // Third-party aggregate scores and old streaming-provider assertions are intentionally not shipped.
+  // User ratings remain available in each person's private library.
+  rating: 0,
   description,
   runtime,
   cast,
   director,
-  providers,
+  providers: [],
   ...(series ?? {}),
 });
 

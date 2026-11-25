@@ -31,11 +31,18 @@ The repository's `vercel.json` rewrites application routes to `index.html` and a
 
 Never test destructive archive reset or account deletion using the owner's real account.
 
-## 3. Streaming availability Edge Function
+## 3. Community-powered streaming availability
 
-Deploy `supabase/functions/watchmode-availability/index.ts` as `watchmode-availability` and set the server-side `WATCHMODE_API_KEY` secret. The function requires a valid signed-in user's access token. If the provider secret is absent, the expected behavior is a clear unavailable/configuration response, not fabricated availability.
+Ducere does not use a third-party streaming-availability API. The approved replacement is the first-party community reporting workflow.
 
-Test exact and ambiguous title names, year mismatches, region changes, unsupported titles, invalid credentials, and provider-link destinations. Confirm that subscription, rental, and purchase offers remain distinguishable.
+- Review `supabase-community-availability.sql`; do not apply it until the live database is reachable, a backup is confirmed, and the RLS policies have been independently reviewed.
+- Seed the provider directory with names and official provider home URLs only. Do not add logos or scrape provider catalogues.
+- Reports must begin pending. Only trusted server-side moderation may create or update verified claims.
+- Evidence links must be HTTPS and must never be fetched by the server.
+- Public reads must return only verified, unexpired claims for the selected country.
+- Until the schema and moderation functions are deployed and tested, the UI intentionally displays no confirmed availability.
+
+The old Watchmode Edge Function is retired. Delete it from Supabase and remove the `WATCHMODE_API_KEY` secret in the Supabase dashboard before release.
 
 ## 4. Account deletion Edge Function
 
