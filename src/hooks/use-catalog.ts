@@ -40,7 +40,7 @@ const readSelectedTitles = (): Title[] => {
     const posterFree = selected.map((title) => title.id.startsWith('tvmaze-')
       ? { ...title, poster: coverArt(title.name, title.type), backdrop: coverArt(title.name, title.type) }
       : title);
-    if (posterFree.some((title, index) => title !== selected[index])) {
+    if (posterFree.some((title, index) => title.poster !== selected[index].poster || title.backdrop !== selected[index].backdrop)) {
       localStorage.setItem(SELECTED_TITLES_KEY, JSON.stringify(posterFree));
     }
     return posterFree;
