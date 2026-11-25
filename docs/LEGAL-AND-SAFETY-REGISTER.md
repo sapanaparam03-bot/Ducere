@@ -27,7 +27,6 @@ This document records known third-party services, licensing constraints, product
 | GitHub | Source control, CI, Dependabot | Keep secrets out of repo; restrict tokens; enable secret/dependency scanning where available; protect main branch | Required; verify branch protection and workflow permissions |
 | TVmaze API | On-demand TV series search | TVmaze says public API data is CC BY-SA; attribution/linking and ShareAlike apply. Do not persist/redistribute data until compatibility with Ducere's database and presentation is reviewed. | Transitional only; disable or obtain an appropriate commercial licence before commercial use if needed |
 | Wikidata | On-demand entity/metadata lookup | Structured data is CC0; follow Wikimedia API usage guidelines, rate limits and stability guidance; attribution is encouraged | May be used for limited lookups; do not bulk-scrape or overload endpoints |
-| Watchmode API | Current streaming availability Edge Function | Developer/free plan is non-commercial, requires attribution/linking, has 2,500 monthly credits and up to 3 countries; free-plan non-image cache limit is 30 days. Paid plans are required for commercial use. API terms impose age/guardian conditions. Third-party image rights are not granted. | **Do not use for a commercial/public monetized release on the free plan.** Confirm account plan, country coverage, age/guardian controls, attribution and cache deletion. Replace or license before commercial launch |
 | Google | Potential future partner/integration | No Google Search scraping. Any Knowledge Graph or other API use must be separately reviewed against its current terms, quotas and licence | No current catalogue ingestion approved |
 | TMDB | Previously considered; not approved as a current source | Do not use commercial data or artwork without a valid licence and compliance with its terms | Not approved for production ingestion |
 | Jikan / MyAnimeList | Previously considered; not approved | Unofficial scraper-backed route; no bulk or persistent import until upstream rights and terms are established | Not approved |
@@ -48,17 +47,13 @@ This document records known third-party services, licensing constraints, product
 - Vercel Acceptable Use Policy: https://vercel.com/legal/acceptable-use-policy
 - GitHub Terms: https://docs.github.com/site-policy/github-terms/github-terms-of-service
 
-## 3. Watchmode hard gate
+## 3. Approved replacement: CC0 metadata + Ducere community availability
 
-The current implementation calls the `watchmode-availability` Edge Function. The repository's own source policy records that the Developer/free plan is non-commercial, has a three-country limit, requires attribution and allows non-image caching for up to 30 days. The approved catalogue target currently names six initial countries (IN, US, GB, CA, DE, AU).
-
-Before any public/commercial release:
-1. Confirm the actual Watchmode account plan and allowed countries in the account dashboard or written agreement.
-2. If remaining on Developer/free, limit use to non-commercial testing, at most three supported countries, visible attribution/linking, no more than 30 days of non-image cache, and remove cached data if the account ends.
-3. Do not use the free plan for a monetized or commercial product, or imply that a future acquisition pitch grants commercial API rights.
-4. Implement a deliberate age/guardian-consent gate or disable the integration for users who do not meet Watchmode's terms; have counsel review the actual flow and relevant jurisdictions.
-5. Never render Watchmode image URLs or infer image rights from API responses.
-6. If these conditions cannot be met, disable the Watchmode feature before public launch and show an honest unavailable state rather than fabricated availability.
+- Wikidata structured data is CC0. It is the sole approved external title-metadata lookup source in the current implementation. Use the official API, descriptive User-Agent, rate-limit handling and item links. Do not treat Wikipedia prose or Wikimedia Commons media as CC0 by association.
+- Streaming availability is not sourced from a third-party API. The intended substitute is Ducere's own community-reporting system, with evidence links, country-specific records, moderation, expiry and audit history.
+- Evidence URLs must not be fetched server-side. Store the link and review it manually; this avoids scraping and SSRF.
+- The community schema is a proposal only until the live database is accessible, reviewed, applied and tested. Until then, the app intentionally reports no confirmed availability.
+- Watchmode application code has been removed. The deployed Supabase function and any stored API key still require dashboard-side removal because the available management integration cannot delete functions or secrets. A disabled replacement may be deployed to stop requests, but it is not the same as deletion.
 
 ## 4. Privacy and personal-data inventory to verify against code
 
