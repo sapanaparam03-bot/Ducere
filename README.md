@@ -2,7 +2,7 @@
 
 **Track what you watched, what you want to watch, what you're watching, and where you can watch it.**
 
-Ducere is a responsive React + Vite app for tracking movies, television, and anime. It includes a personal library, watchlist, in-progress tracking, title details, recommendations, calendar, profile insights, import/export tools, and region-aware streaming availability integrations.
+Ducere is a responsive React + Vite app for tracking movies, television, and anime. It includes a personal library, watchlist, in-progress tracking, title details, recommendations, calendar, profile insights, import/export tools, and a community-powered streaming-availability design.
 
 ## Product direction
 
@@ -39,9 +39,9 @@ These are browser-visible configuration values. Never set a Supabase service-rol
 2. Review `supabase-schema.sql`, then run it in that project's SQL editor. It enables Row Level Security and limits profile/archive rows to the signed-in owner.
 3. Set the two Vite environment variables in Vercel and redeploy.
 4. Configure email/auth redirect URLs for the final production domain.
-5. Deploy and test Edge Functions separately; see `docs/PRODUCTION-SETUP.md` and `docs/ACCOUNT-DELETION-DEPLOYMENT.md`.
+5. Deploy and test the account-deletion Edge Function separately; see `docs/PRODUCTION-SETUP.md` and `docs/ACCOUNT-DELETION-DEPLOYMENT.md`. Delete the retired Watchmode function and remove its API key from Supabase.
 
-The current `watchmode-availability` Edge Function is transitional and remains in place until the Ducere-owned availability workflow reaches feature parity and passes migration/security tests. Do not remove it or the existing on-demand catalogue search prematurely. Its server-side secret must never be exposed in browser code.
+Wikidata is the only external catalogue lookup source currently used; its structured data is CC0. Streaming availability is being moved to Ducere's own community reports and moderation. No third-party availability API is called. The old Watchmode Edge Function and API key must be removed from the Supabase dashboard before release.
 
 ## Release readiness
 
