@@ -14,10 +14,10 @@
 The following details were checked in the current `main` branch during implementation planning:
 
 - `supabase-schema.sql` defines `profiles` and `user_titles`. The personal library primary key is (`user_id`, `title_id`), and `title_id` is text. Status values are `watchlist`, `watching`, and `watched`; season, episode, progress, rating, review, and dates are stored there. Preserve these fields and their values.
-- `src/hooks/use-catalog.ts` currently merges a built-in catalogue with locally retained selected titles. Its current selected-title validation expects IDs prefixed `tvmaze-` or `wikidata-` and includes poster/backdrop fields. A migration must support legacy IDs and change this validation deliberately rather than silently dropping saved selections.
-- `src/lib/catalogue-search.ts` performs user-initiated TVmaze show search and Wikidata entity search. It uses permitted text metadata, links to source records, and uses Ducere-created placeholders; provider image URLs are ignored. Do not bulk import from these endpoints; replace this path only after Ducere's own title submission/search is ready.
+- `src/hooks/use-catalog.ts` currently merges a built-in catalogue with locally retained selected titles. Its selected-title validation accepts new `wikidata:` identifiers and retains legacy `tvmaze-`/`wikidata-` identifiers and includes poster/backdrop fields. A migration must support legacy IDs and change this validation deliberately rather than silently dropping saved selections.
+- `src/lib/catalogue-search.ts` performs user-initiated Wikidata searches only. Wikidata structured data is CC0; the adapter links to the QID and uses Ducere-created placeholders. TVmaze was removed from new searches; legacy saved TVmaze titles remain in local libraries for continuity.
 - `src/lib/live-catalog.ts` currently returns the built-in `TITLES` list only; despite the name, it does not load the proposed shared database.
-- `src/lib/availability.ts` calls the `watchmode-availability` Edge Function. `src/components/availability-panel.tsx` displays Watchmode attribution and calls returned records verified. Replace this carefully: the new UI must show pending/contested/expired states accurately and must not label unverified community submissions as verified.
+- `src/lib/availability.ts` no longer calls a third-party provider. The UI deliberately shows no confirmed results until the first-party community reports, votes, moderation and expiry tables are deployed and tested.
 - The existing `supabase-catalogue-schema.sql` is only a proposal. It is source-centric, contains poster/backdrop/still fields, and permits broad public reads. It does not implement community reports, votes, evidence, moderation, or reputation. Do not apply it unchanged.
 
 ### Compatibility and migration requirements
@@ -31,7 +31,7 @@ The following details were checked in the current `main` branch during implement
 
 ## Current implementation facts and migration constraint
 
-The current React/Vite app uses Supabase for accounts and personal library sync. The existing `public.user_titles.title_id` is text, so new catalogue IDs must remain stable text identifiers. The app currently has a built-in catalogue, on-demand TVmaze/Wikidata search, and a Watchmode availability Edge Function. These must not be removed until the replacement catalogue and availability workflow has passed feature-parity and migration tests.
+The current React/Vite app uses Supabase for accounts and personal library sync. The existing `public.user_titles.title_id` is text, so new catalogue IDs must remain stable text identifiers. The app currently has a built-in catalogue, on-demand Wikidata search, and a first-party community-availability design. No external availability API is used. These must not be removed until the replacement catalogue and availability workflow has passed feature-parity and migration tests.
 
 The existing `supabase-catalogue-schema.sql` is an earlier proposal with third-party source-oriented fields and artwork columns. It is not the target design. Review it before use; do not apply it unchanged.
 
